@@ -67,52 +67,32 @@
 */
 
 /* USER CODE BEGIN (2) */
+Ltc682x ltcBat = {0};
+
+void ltcInit(spiBASE_t * spiReg);
 
 #define UNUSED(x)   ((void)x)
 uint8_t toggle = 1;
 uint8_t returnVarningClose;
-
-bool gpioAStatus[5] = {false, false, true, true, true};
-bool gpioBStatus[4] = {false, false, false, false};
-bool dccAStatus[12] = {false};
-bool dccBStatus[4] = {false};
 
 /* USER CODE END */
 
 int main(void)
 {
 /* USER CODE BEGIN (3) */
-    CellInf cellInf;
-    _enable_interrupt_();
+    ltcInit(spiREG1);
 
     gioInit();
-    hetInit();
-    pwmEnableNotification(hetREG1, pwm0, pwmEND_OF_PERIOD);
-    pwmStart(hetRAM1, pwm0);
-
-    AE_ltcInit(spiREG1, 1, &cellInf);
-
-    AE_ltcSetcfgraRefOn(&cellInf, true);
-    AE_ltcSetcfgraAdcOpt(&cellInf, false);
-    AE_ltcSetcfgraGpio(&cellInf, gpioAStatus);
-    AE_ltcSetcfgraDcc(&cellInf, dccAStatus);
-    AE_ltcSetcfgraDct0(&cellInf, DIS_4_MIN);
-    AE_ltcSetcfgraUnderVoltage(&cellInf, 3);
-    AE_ltcSetcfgraOverVoltage(&cellInf, 4.2);
-    Ae_ltcSetcfgrbFdrf(&cellInf, false);
-    Ae_ltcSetcfgrbDTMEN(&cellInf, true);
-    Ae_ltcSetcfgrbPs(&cellInf, PATH_ADC_ALL);
-    AE_ltcSetcfgrbGpio(&cellInf, gpioBStatus);
-    AE_ltcSetcfgrbDcc(&cellInf, dccBStatus);
 
 
-    uint16_t isoTxData[8];
+#if 0       // code testing V1.1    working successfully
+    uint16_t isoTxData[12];
     uint16_t isoRxData[8] = {0};
     uint16_t eceTx;
 
     uint16_t isoData[6] = {0x7C, 0x77, 0x44, 0x22, 0x11, 0x55};
 
-    eceTx = pec15((uint8_t*)isoData, 6);
+    eceTx = AE_pec15((uint8_t*)isoData, 6);
 
     isoTxData[0] = cmdWRCFGA_pu16[0];
     isoTxData[1] = cmdWRCFGA_pu16[1];
@@ -126,16 +106,78 @@ int main(void)
     isoTxData[9] = isoData[5];
     isoTxData[10] = (eceTx >> 8) & 0xFF;
     isoTxData[11] = (eceTx >> 0) & 0xFF;
+    spiDAT1_t spiDat_s =            // spi configuration parameters
+    {
+         .CSNR = 0,
+         .CS_HOLD = 1,
+         .DFSEL = SPI_FMT_0,
+         .WDEL = 0
+    };
+#endif
+
+    LTC_status status;
+
+
+    AE_delayMs(2);  // Twakeup time
+    AE_ltcSetPwm(&ltcBat, S_PIN_ALL, PWM_DUTY_LEVEL_14);
 
     while(1)
     {
-        #if 1   // code testing V1.0
+#if 0   // read the cell voltage
+        AE_ltcStartCellAdc(&ltcBat, MODE_7KHZ, true, CELL_ALL);
+        //!< check adcMeasure duration is completed
+        while(!AE_ltcAdcMeasureState());
+        AE_ltcReadCellVoltage(&ltcBat);
+#endif
+
+#if 0   // GPIO voltage Measure
+        AE_ltcStartGpioAdc(&ltcBat, MODE_7KHZ, GPIO_ALL);
+        while(!AE_ltcAdcM   easureState());
+        AE_ltcReadGPIOVoltage(&ltcBat);
+#endif
+
+#if 0   //read status registerA
+        AE_ltcStartStatusAdc(&ltcBat, MODE_7KHZ, CHST_ALL);
+        //!< check adcMeasure duration is completed
+        while(!AE_ltcAdcMeasureState());
+        AE_ltcReadStatusRegA(&ltcBat);
+#endif
+
+#if 0   //read status registerB
+        AE_ltcStartStatusAdc(&ltcBat, MODE_7KHZ, CHST_ALL);
+        //!< check adcMeasure duration is completed
+        while(!AE_ltcAdcMeasureState());
+        AE_ltcReadStatusRegB(&ltcBat);
+#endif
+
+#if 0
+        AE_ltcStartStatusAdc(&ltcBat, MODE_7KHZ, CHST_ALL);
+        while(!AE_ltcAdcMeasureState());
+        AE_ltcReadStatusRegA(&ltcBat);
+        AE_ltcReadStatusRegB(&ltcBat);
+
+#endif
+
+#if 0   //pwm duty setting
+        AE_ltcSetPwm(&ltcBat, S_PIN_1 | S_PIN_2| S_PIN_3, PWM_DUTY_LEVEL_8);
+        AE_ltcSetPwm(&ltcBat, S_PIN_4 | S_PIN_5| S_PIN_6, PWM_DUTY_LEVEL_8);
+#endif
+
+#if 0    //LTC6812-1 has 3 clear ADC commands: CLRCELL, CLRAUX and CLRSTAT
+        status = AE_ltcClearCellAdc(&ltcBat);
+        status = AE_ltcClearGpioAdc(&ltcBat);
+        status = AE_ltcClearStatusAdc(&ltcBat);
+#endif
+
+        //<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<BEFORE WORKING LTC>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+        #if 0   // code testing V1.1    working successfully
 
         AE_ltcWakeUpSleep();
 
         AE_LTC_CS_ON();
 
-        spiTransmitData(spiREG1, &__spiDat_s, 12, isoTxData);
+        spiTransmitData(spiREG1, &spiDat_s, 12, isoTxData);
 
         AE_LTC_CS_OFF();
 
@@ -149,15 +191,15 @@ int main(void)
 
 //        spiTransmitAndReceiveData(spiREG1, &__spiDat_s, 12, cmdRDCFGA_pu16, isoRxData);
 
-        spiTransmitData(spiREG1, &__spiDat_s, 4, cmdRDCFGA_pu16);
-        spiReceiveData(spiREG1, &__spiDat_s, 8, isoRxData);
+        spiTransmitData(spiREG1, &spiDat_s, 4, cmdRDCFGA_pu16);
+        spiReceiveData(spiREG1, &spiDat_s, 8, isoRxData);
 
         AE_LTC_CS_OFF();
 
-        AE_delayMs(1000);
+        AE_delayMs(10000);
         #endif
 
-        #if 0   // code testing V1.1
+        #if 0   // code testing V1.0
 
         //!< configuration A setting
         AE_ltcWriteConfiguration(&cellInf);
@@ -169,7 +211,7 @@ int main(void)
 
         AE_LTC_CS_ON();
 
-        spiTransmitData(spiREG1, &__spiDat_s, 4, txDat);
+        spiTransmitData(spiREG1, &spiDat_s, 4, txDat);
 
         AE_LTC_CS_OFF();
 
@@ -194,6 +236,7 @@ int main(void)
 
         AE_delayMs(100);
 
+        if(status == LTC_OK);                   //!< close the status warning
         if(returnVarningClose == 10)    break;  //!< close return 0 warning
     }
 
@@ -206,7 +249,31 @@ int main(void)
 
 /* USER CODE BEGIN (4) */
 
+void ltcInit(spiBASE_t * spiReg)
+{
+    ltcBat.batConf.minCellVolt = 3.76;
+    ltcBat.batConf.maxCellVolt = 4.2;
 
+    ltcBat.batConf.adcopt = false;
+    ltcBat.batConf.refon = true;
+
+    ltcBat.batConf.gioAPullOffPin = GPIO_5 | GPIO_4 | GPIO_3;
+    ltcBat.batConf.gioBPullOffPin = GPIO_8 | GPIO_7 | GPIO_6;
+
+    ltcBat.batConf.numberOfSerialCell = 15;
+    ltcBat.batConf.numberOfSlave = 1;
+
+    ltcBat.batConf.dischargeCellCfgA4 = DCC_1 | DCC_2 | DCC_3 | DCC_4 | DCC_5 | DCC_6 | DCC_7 | DCC_8;    //if enabld discharge cell
+    ltcBat.batConf.dischargeCellCfgA5 = DCC_9 | DCC_10| DCC_10| DCC_11 | DCC_12;
+    ltcBat.batConf.dischargeCellCfgB0 = DCC_13 | DCC_14 | DCC_15;
+    ltcBat.batConf.dischargeCellCfgB1 = DCC_0;
+
+    ltcBat.batConf.dischargeTime = DIS_60_MIN;
+
+    ltcBat.batConf.dischargeTimeMonitor = true;
+
+    AE_ltcInit(spiReg, &ltcBat);
+}
 
 
 /* USER CODE END */

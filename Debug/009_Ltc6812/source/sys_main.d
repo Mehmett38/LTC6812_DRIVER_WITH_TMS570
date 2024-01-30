@@ -26,6 +26,7 @@
 009_Ltc6812/source/sys_main.obj: C:/Users/mehmet.dincer/Desktop/MehDin/codeComposer/009_Ltc6812/009_Ltc6812/include/sys_core.h
 009_Ltc6812/source/sys_main.obj: C:/Users/mehmet.dincer/Desktop/MehDin/codeComposer/009_Ltc6812/009_Ltc6812/include/gio.h
 009_Ltc6812/source/sys_main.obj: C:/Users/mehmet.dincer/Desktop/MehDin/codeComposer/009_Ltc6812/ltc681x/crc/crc15.h
+009_Ltc6812/source/sys_main.obj: C:/ti/ccs1120/ccs/tools/compiler/ti-cgt-arm_20.2.5.LTS/include/stdlib.h
 
 ../009_Ltc6812/source/sys_main.c:
 
@@ -78,4 +79,6 @@ C:/Users/mehmet.dincer/Desktop/MehDin/codeComposer/009_Ltc6812/009_Ltc6812/inclu
 C:/Users/mehmet.dincer/Desktop/MehDin/codeComposer/009_Ltc6812/009_Ltc6812/include/gio.h:
 
 C:/Users/mehmet.dincer/Desktop/MehDin/codeComposer/009_Ltc6812/ltc681x/crc/crc15.h:
+
+C:/ti/ccs1120/ccs/tools/compiler/ti-cgt-arm_20.2.5.LTS/include/stdlib.h:
 

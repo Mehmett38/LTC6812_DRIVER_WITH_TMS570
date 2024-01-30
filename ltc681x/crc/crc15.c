@@ -36,7 +36,7 @@ void init_PEC15_Table()
     }
 }
 
-uint16_t pec15(uint8_t* data, uint16_t len)
+uint16_t AE_pec15(uint8_t* data, uint16_t len)
 {
     uint16_t remainder, address;
     remainder = 16;//PEC seed
