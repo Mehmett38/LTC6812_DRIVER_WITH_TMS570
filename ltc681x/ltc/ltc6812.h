@@ -31,7 +31,6 @@
 #define TRANSMIT_LEN                    (6)
 #define RECEIVE_LEN                     (8)
 
-
 //!< @refgroup GPIOA
 #define GPIO_1                          (1 << 3)
 #define GPIO_2                          (1 << 4)
@@ -42,27 +41,24 @@
 #define GPIO_7                          (1 << 1)
 #define GPIO_8                          (1 << 2)
 
-//!< @refgroupB1 dicshargeCell
-#define DCC_0                           (1 << 2)
-//!< @refgroupA4 dicshargeCell
-#define DCC_1                           (1 << 0)
-#define DCC_2                           (1 << 1)
-#define DCC_3                           (1 << 2)
-#define DCC_4                           (1 << 3)
-#define DCC_5                           (1 << 4)
-#define DCC_6                           (1 << 5)
-#define DCC_7                           (1 << 6)
-#define DCC_8                           (1 << 7)
-//!< @refgroupA5 dicshargeCell
-#define DCC_9                           (1 << 0)
-#define DCC_10                          (1 << 1)
-#define DCC_11                          (1 << 2)
-#define DCC_12                          (1 << 3)
-//!< @refgroupB0 dicshargeCell
-#define DCC_13                          (1 << 4)
-#define DCC_14                          (1 << 5)
-#define DCC_15                          (1 << 6)
-#define DCC_ALL                         (0x77)
+//!< @refgroup dcc
+#define DCC_0                           (1 << 0)
+#define DCC_1                           (1 << 1)
+#define DCC_2                           (1 << 2)
+#define DCC_3                           (1 << 3)
+#define DCC_4                           (1 << 4)
+#define DCC_5                           (1 << 5)
+#define DCC_6                           (1 << 6)
+#define DCC_7                           (1 << 7)
+#define DCC_8                           (1 << 8)
+#define DCC_9                           (1 << 9)
+#define DCC_10                          (1 << 10)
+#define DCC_11                          (1 << 11)
+#define DCC_12                          (1 << 12)
+#define DCC_13                          (1 << 13)
+#define DCC_14                          (1 << 14)
+#define DCC_15                          (1 << 15)
+#define DCC_ALL                         (0xFFFF)
 
 //!< @refgroup CH
 #define CELL_ALL                        (0x00)
@@ -127,11 +123,16 @@
 
 #define AE_LTC_CS_ON()                  (spiREG1->PC3 &= ~(1 << 0)) //drive low the cs0 pin
 #define AE_LTC_CS_OFF()                 (spiREG1->PC3 |= 1 << 0)    //drive hight the cs0 pins
-
+#define AE_LTC_GET_BIT(x,y)             ((x >> y) & 0x01)
+#define AE_LTC_SET_BIT(x,y, b)          (                       \
+                                            x &= ~(1 << y);     \
+                                            x |= (b << y);      \
+                                        )
 //<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<-ENUMS->>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 typedef enum{
     LTC_WRONG_CRC,
     LTC_OK,
+    LTC_OPEN_WIRE,
 }LTC_status;
 
 typedef enum{
@@ -329,19 +330,12 @@ typedef struct{
 }CFGBR;
 
 typedef struct{
-    uint8_t numberOfSerialCell;
-    uint8_t numberOfSlave;
-    bool adcopt;
-    bool refon;
-    float maxCellVolt;
-    float minCellVolt;
+    uint8_t numberOfSerialCell;     // cell number in a slave
+    uint8_t numberOfSlave;          // slave number
+    bool adcopt;                    // using to configure system ADC read speed
+    bool refon;                     // to understand better investigate the core working diagram
     uint8_t gioAPullOffPin;         // @refgroup gioA   set as pull of
     uint8_t gioBPullOffPin;         // @refgroup gioB   set as pull of
-    uint16_t dischargeCellCfgA4;    // @refgroupA4 dicshargeCell
-    uint16_t dischargeCellCfgA5;    // @refgroupA5 dicshargeCell
-    uint16_t dischargeCellCfgB0;    // @refgroupB0 dicshargeCell
-    uint16_t dischargeCellCfgB1;    // @refgroupB1 dicshargeCell
-    DischargeTime dischargeTime;
     bool dischargeTimeMonitor;
 }BatteryConf;
 
@@ -434,6 +428,15 @@ typedef struct{
 }StatusRegB;
 
 typedef struct{
+    union{
+        uint16_t flg;
+        struct{
+
+        };
+    };
+}OverVoltageFlag;
+
+typedef struct{
     CFGAR cfgAr;
     CFGBR cfgBr;
     BatteryConf batConf;
@@ -471,7 +474,8 @@ static uint16_t cmdCLRSCTRL_pu16[4] = {0x00, 0x18, 0x05, 0x7C}; // !note
 static uint16_t cmdCLRCELL_pu16[4]  = {0x07, 0x11, 0xC9, 0xC0};
 static uint16_t cmdCLRAUX_pu16[4]   = {0x07, 0x12, 0xDF, 0xA4};
 static uint16_t cmdCLRSTAT_pu16[4]  = {0x07, 0x13, 0x54, 0x96};
-
+static uint16_t cmdMute_pu16[4]     = {0x00, 0x28, 0xE8, 0x0E};
+static uint16_t cmdUnMute_pu16[4]   = {0x00, 0x29, 0x63, 0x3C};
 
 
 //<<<<<<<<<<<<<<<<<<<<<<<<<-FUNCTION PROTOTYPES->>>>>>>>>>>>>>>>>>>>>>>>>>
@@ -491,10 +495,14 @@ LTC_status AE_ltcReadStatusRegB(Ltc682x * ltcBat);
 LTC_status AE_ltcClearCellAdc();
 LTC_status AE_ltcClearGpioAdc(Ltc682x * ltcBat);
 LTC_status AE_ltcClearStatusAdc(Ltc682x * ltcBat);
-void AE_ltcSetPwm(Ltc682x * ltcBat, uint16_t S_PIN_, uint8_t PWM_DUTY_LEVEL_);
+void AE_ltcStartPwm(Ltc682x * ltcBat, uint16_t S_PIN_, uint8_t PWM_DUTY_LEVEL_);
+void AE_ltcPausePwm(Ltc682x * ltcBat);
+void AE_ltcContinuePwm(Ltc682x * ltcBat);
 LTC_status AE_ltcReadStatusPwm(Ltc682x * ltcBat);
-void AE_ltcBalance(Ltc682x * ltcBat, DischargeTime dischargeTime, float underVolt, float overVolt);
+void AE_ltcSetBalance(Ltc682x * ltcBat, DischargeTime DIS_, float underVolt, float overVolt, uint16_t DCC_);
 float AE_ltcMinCellVolt(Ltc682x * ltcBat);
+LTC_status AE_ltcIsCellOpenWire(Ltc682x * ltcBat, AdcMode adcMode, uint8_t CELL_);
+LTC_status AE_ltcIsGpioOpenWire(Ltc682x * ltcBat, AdcMode adcMode, uint8_t CELL_);
 static void AE_ltcTick(uint32_t );
 uint32_t getUsTick();
 void AE_delayMs(uint32_t delay_u32);

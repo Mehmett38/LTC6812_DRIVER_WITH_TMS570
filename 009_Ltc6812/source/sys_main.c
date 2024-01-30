@@ -52,9 +52,6 @@
 /* USER CODE BEGIN (1) */
 
 #include "ltc6812.h"
-#include "het.h"
-#include "sys_core.h"
-#include "gio.h"
 
 /* USER CODE END */
 
@@ -121,20 +118,26 @@ int main(void)
 
     AE_delayMs(2);  // Twakeup time
 
+#if 1               // read the lowest cell voltage and balance the other cell up to this level
     AE_ltcStartCellAdc(&ltcBat, MODE_7KHZ, true, CELL_ALL);
     //!< check adcMeasure duration is completed
     while(!AE_ltcAdcMeasureState());
     status = AE_ltcReadCellVoltage(&ltcBat);
-    status = AE_ltcClearCellAdc(&ltcBat);
+    status = AE_ltcClearCellAdc();
 
-    AE_ltcSetPwm(&ltcBat, S_PIN_ALL, PWM_DUTY_LEVEL_14);
-    AE_ltcBalance(&ltcBat, DIS_2_MIN, AE_ltcMinCellVolt(&ltcBat), 4.2);
+    AE_ltcSetBalance(&ltcBat, DIS_90_MIN, AE_ltcMinCellVolt(&ltcBat), 4.2, DCC_ALL);
+    AE_ltcStartPwm(&ltcBat, S_PIN_ALL, PWM_DUTY_LEVEL_14);
+#endif
 
 
     while(1)
     {
 
 
+#if 0   // open wire check
+        status = AE_ltcIsCellOpenWire(&ltcBat, MODE_7KHZ, CELL_ALL);
+        status = AE_ltcIsGpioOpenWire(&ltcBat, MODE_7KHZ, CELL_ALL);
+#endif
 
 #if 0   // read the cell voltage
         AE_ltcStartCellAdc(&ltcBat, MODE_7KHZ, true, CELL_ALL);
@@ -163,17 +166,53 @@ int main(void)
         AE_ltcReadStatusRegB(&ltcBat);
 #endif
 
-#if 0
+#if 0   // read the status register
+        AE_ltcStartStatusAdc(&ltcBat, MODE_7KHZ, CHST_ALL);
+        while(!AE_ltcAdcMeasureState());
+        AE_ltcReadStatusRegA(&ltcBat);
+        AE_ltcReadStatusRegB(&ltcBat);
+#endif
+
+#if 0   // when under and over limits are exceeded for cellx, x.th flag is raise
+
         AE_ltcStartStatusAdc(&ltcBat, MODE_7KHZ, CHST_ALL);
         while(!AE_ltcAdcMeasureState());
         AE_ltcReadStatusRegA(&ltcBat);
         AE_ltcReadStatusRegB(&ltcBat);
 
+        if(ltcBat.statusRegB.CellUnderFlag.cell1)
+        {
+            // cell1 undervoltage flag is raise enter this block
+        }
+#endif
+
+
+#if 0   //internal die temperature
+        AE_ltcStartStatusAdc(&ltcBat, MODE_7KHZ, CHST_ALL);
+        while(!AE_ltcAdcMeasureState());
+        AE_ltcReadStatusRegA(&ltcBat);
+        AE_ltcReadStatusRegB(&ltcBat);
+
+        if(ltcBat->statusRegA.internalDieTemp > 150)    //configuration register is reset
+        {
+            /*the thermal shutdown circuit trips and resets the Configuration
+             * Register Groups (except the MUTE bit) and turns off all discharge switches.*/
+        }
+
+        if(ltcBat.statusRegB.thsd)  // system die temperature pass the 150degree and reset the configuration register
+        {
+
+        }
 #endif
 
 #if 0   //pwm duty setting
-        AE_ltcSetPwm(&ltcBat, S_PIN_1 | S_PIN_2| S_PIN_3, PWM_DUTY_LEVEL_8);
-        AE_ltcSetPwm(&ltcBat, S_PIN_4 | S_PIN_5| S_PIN_6, PWM_DUTY_LEVEL_8);
+        AE_ltcStartPwm(&ltcBat, S_PIN_1 | S_PIN_2| S_PIN_3, PWM_DUTY_LEVEL_8);
+        AE_ltcStartPwm(&ltcBat, S_PIN_4 | S_PIN_5| S_PIN_6, PWM_DUTY_LEVEL_8);
+#endif
+
+#if 0
+        AE_ltcPausePwm(&ltcBat);        // pause the pwm
+        AE_ltcContinuePwm(&ltcBat);     // continue if pwm is paused
 #endif
 
 #if 0    //LTC6812-1 has 3 clear ADC commands: CLRCELL, CLRAUX and CLRSTAT
@@ -264,24 +303,19 @@ int main(void)
 
 void ltcInit(spiBASE_t * spiReg)
 {
-    ltcBat.batConf.minCellVolt = 3.76;
-    ltcBat.batConf.maxCellVolt = 4.2;
+    ltcBat.batConf.adcopt = false;          //ADC conversion mode selection, if 1->14kHz, 3kHz, 1kHz or 2kHz, 0-> 27kHz, 7kHz, 422Hz or 26Hz
+    ltcBat.batConf.refon = true;            //referances remain powered on until watchog timeout
 
-    ltcBat.batConf.adcopt = false;
-    ltcBat.batConf.refon = true;
+    ltcBat.batConf.gioAPullOffPin = GPIO_5 | GPIO_4 | GPIO_3;   // selected pin's pull down off
+    ltcBat.batConf.gioBPullOffPin = GPIO_8 | GPIO_7 | GPIO_6;   // selected pin's pull down off
 
-    ltcBat.batConf.gioAPullOffPin = GPIO_5 | GPIO_4 | GPIO_3;
-    ltcBat.batConf.gioBPullOffPin = GPIO_8 | GPIO_7 | GPIO_6;
+    ltcBat.batConf.numberOfSerialCell = 15;                     // cell number in a slave
+    ltcBat.batConf.numberOfSlave = 1;                           // number of slave
 
-    ltcBat.batConf.numberOfSerialCell = 15;
-    ltcBat.batConf.numberOfSlave = 1;
-
-    ltcBat.batConf.dischargeTimeMonitor = true;
-
-    ltcBat.batConf.dischargeCellCfgA4 = DCC_1 | DCC_2 | DCC_3 | DCC_4 | DCC_5 | DCC_6 | DCC_7 | DCC_8;    //if enabld discharge cell
-    ltcBat.batConf.dischargeCellCfgA5 = DCC_9 | DCC_10| DCC_10| DCC_11 | DCC_12;
-    ltcBat.batConf.dischargeCellCfgB0 = DCC_13 | DCC_14 | DCC_15;
-    ltcBat.batConf.dischargeCellCfgB1 = DCC_0;
+    ltcBat.batConf.dischargeTimeMonitor = true;                 //The LTC6812-1 has the ability to periodically monitor
+                                                                //cell voltages while the discharge timer is active. The host
+                                                                //should write the DTMEN bit in Configuration Register
+                                                                //Group B to 1 to enable this feature.
 
     AE_ltcInit(spiReg, &ltcBat);
 }
