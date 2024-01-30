@@ -39,9 +39,6 @@ spiDAT1_t spiDat_s =              // spi configuration parameters
  */
 void AE_ltcInit(spiBASE_t * spi, Ltc682x * ltcBat)
 {
-    uint16_t underVolt;     // (VUV + 1) * 16 * 10uV
-    uint16_t overVolt;      // VOV * 16 * 10uV
-
     spiInit();
     init_PEC15_Table(); //!< Crc start table
 
@@ -60,15 +57,6 @@ void AE_ltcInit(spiBASE_t * spi, Ltc682x * ltcBat)
     ltcBat->cfgAr.CFGAR0.ADCOPT |= ltcBat->batConf.adcopt;
     ltcBat->cfgAr.CFGAR0.REFON |= ltcBat->batConf.refon;
     ltcBat->cfgAr.CFGAR0.cfg |= ltcBat->batConf.gioAPullOffPin;
-
-    underVolt = ltcBat->batConf.minCellVolt * 625.0 - 1;
-    overVolt = ltcBat->batConf.maxCellVolt * 625;
-
-    ltcBat->cfgAr.CFGAR1.cfg |= underVolt & 0x00FF;
-    ltcBat->cfgAr.CFGAR2.cfg |= (underVolt >> 8) & 0x000F;
-
-    ltcBat->cfgAr.CFGAR2.cfg |= (overVolt << 4) & 0x00F0;
-    ltcBat->cfgAr.CFGAR3.cfg |= (overVolt >> 4) & 0x00FF;
 
     ltcBat->cfgAr.CFGAR4.cfg |= ltcBat->batConf.dischargeCellCfgA4;
     ltcBat->cfgAr.CFGAR5.cfg |= ltcBat->batConf.dischargeCellCfgA5 & 0x000F;
@@ -516,8 +504,9 @@ LTC_status AE_ltcReadStatusRegB(Ltc682x * ltcBat)
  * @param[in] bms global variable
  * @return if packet is true ok else crc error
  */
-LTC_status AE_ltcClearCellAdc(Ltc682x * ltcBat)
+LTC_status AE_ltcClearCellAdc()
 {
+    Ltc682x ltcTemp;
     LTC_status status;
 
     AE_ltcWakeUpSleep();
@@ -528,10 +517,10 @@ LTC_status AE_ltcClearCellAdc(Ltc682x * ltcBat)
 
     AE_LTC_CS_OFF();
 
-    status = AE_ltcReadCellVoltage(ltcBat);
+    status = AE_ltcReadCellVoltage(&ltcTemp);
     if(status == LTC_WRONG_CRC) return status;
 
-    if(ltcBat->volt.cell1 > 6.5)        //!< if adc conversion is close read the pin 0xFF but this variable is
+    if(ltcTemp.volt.cell1 > 6.5)        //!< if adc conversion is close read the pin 0xFF but this variable is
         return LTC_OK;                  // float, so value > 6.5 condition is consistent
     else
         return LTC_WRONG_CRC;
@@ -623,9 +612,53 @@ void AE_ltcSetPwm(Ltc682x * ltcBat, uint16_t S_PIN_, uint8_t PWM_DUTY_LEVEL_)
  */
 LTC_status AE_ltcReadStatusPwm(Ltc682x * ltcBat)
 {
-    LTC_status status;
-
+    LTC_status status = LTC_WRONG_CRC;
     return status;
+}
+
+/**
+ * @brief start the bms balance
+ * @param[in] bms global variable
+ * @param[in] discharge time
+ * @param[in] discharge underVolt
+ * @param[in] discharge overVolt
+ * @return none
+ */
+void AE_ltcBalance(Ltc682x * ltcBat, DischargeTime dischargeTime, float underVolt, float overVolt)
+{
+    uint16_t underVoltTemp;     // (VUV + 1) * 16 * 10uV
+    uint16_t overVoltTemp;      // VOV * 16 * 10uV
+
+    underVoltTemp = underVolt * 625.0 - 1;
+    overVoltTemp = overVolt * 625;
+
+    ltcBat->cfgAr.CFGAR1.cfg |= underVoltTemp & 0x00FF;
+    ltcBat->cfgAr.CFGAR2.cfg |= (underVoltTemp >> 8) & 0x000F;
+
+    ltcBat->cfgAr.CFGAR2.cfg |= (overVoltTemp << 4) & 0x00F0;
+    ltcBat->cfgAr.CFGAR3.cfg |= (overVoltTemp >> 4) & 0x00FF;
+
+    ltcBat->cfgAr.CFGAR5.cfg |= (dischargeTime << 4) & 0x00F0;
+}
+
+/**
+ * @brief return the minimum cell voltage
+ * @param[in] bms global variable
+ * @return minimum cell voltage
+ */
+float AE_ltcMinCellVolt(Ltc682x * ltcBat)
+{
+    float *fptr = (float *)&ltcBat->volt.cell1;
+    float min;
+    min = fptr[0];
+
+    for(i = 1; i < 15; i++)
+    {
+        if(fptr[i] < min)
+            min = fptr[i];
+    }
+
+    return min;
 }
 
 /**

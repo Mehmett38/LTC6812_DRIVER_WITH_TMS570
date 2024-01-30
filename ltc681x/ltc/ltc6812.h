@@ -125,8 +125,8 @@
 #define PWM_DUTY_LEVEL_15               (15)    //!< %100
 
 
-#define AE_LTC_CS_ON()              (spiREG1->PC3 &= ~(1 << 0)) //drive low the cs0 pin
-#define AE_LTC_CS_OFF()             (spiREG1->PC3 |= 1 << 0)    //drive hight the cs0 pins
+#define AE_LTC_CS_ON()                  (spiREG1->PC3 &= ~(1 << 0)) //drive low the cs0 pin
+#define AE_LTC_CS_OFF()                 (spiREG1->PC3 |= 1 << 0)    //drive hight the cs0 pins
 
 //<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<-ENUMS->>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 typedef enum{
@@ -488,11 +488,13 @@ LTC_status AE_ltcReadGPIOVoltage(Ltc682x * ltcBat);
 void AE_ltcStartStatusAdc(Ltc682x * ltcBat, AdcMode adcMode, uint8_t GPIO_);
 LTC_status AE_ltcReadStatusRegA(Ltc682x * ltcBat);
 LTC_status AE_ltcReadStatusRegB(Ltc682x * ltcBat);
-LTC_status AE_ltcClearCellAdc(Ltc682x * ltcBat);
+LTC_status AE_ltcClearCellAdc();
 LTC_status AE_ltcClearGpioAdc(Ltc682x * ltcBat);
 LTC_status AE_ltcClearStatusAdc(Ltc682x * ltcBat);
 void AE_ltcSetPwm(Ltc682x * ltcBat, uint16_t S_PIN_, uint8_t PWM_DUTY_LEVEL_);
 LTC_status AE_ltcReadStatusPwm(Ltc682x * ltcBat);
+void AE_ltcBalance(Ltc682x * ltcBat, DischargeTime dischargeTime, float underVolt, float overVolt);
+float AE_ltcMinCellVolt(Ltc682x * ltcBat);
 static void AE_ltcTick(uint32_t );
 uint32_t getUsTick();
 void AE_delayMs(uint32_t delay_u32);

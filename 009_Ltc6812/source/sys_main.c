@@ -118,11 +118,24 @@ int main(void)
     LTC_status status;
 
 
+
     AE_delayMs(2);  // Twakeup time
+
+    AE_ltcStartCellAdc(&ltcBat, MODE_7KHZ, true, CELL_ALL);
+    //!< check adcMeasure duration is completed
+    while(!AE_ltcAdcMeasureState());
+    status = AE_ltcReadCellVoltage(&ltcBat);
+    status = AE_ltcClearCellAdc(&ltcBat);
+
     AE_ltcSetPwm(&ltcBat, S_PIN_ALL, PWM_DUTY_LEVEL_14);
+    AE_ltcBalance(&ltcBat, DIS_2_MIN, AE_ltcMinCellVolt(&ltcBat), 4.2);
+
 
     while(1)
     {
+
+
+
 #if 0   // read the cell voltage
         AE_ltcStartCellAdc(&ltcBat, MODE_7KHZ, true, CELL_ALL);
         //!< check adcMeasure duration is completed
@@ -263,14 +276,12 @@ void ltcInit(spiBASE_t * spiReg)
     ltcBat.batConf.numberOfSerialCell = 15;
     ltcBat.batConf.numberOfSlave = 1;
 
+    ltcBat.batConf.dischargeTimeMonitor = true;
+
     ltcBat.batConf.dischargeCellCfgA4 = DCC_1 | DCC_2 | DCC_3 | DCC_4 | DCC_5 | DCC_6 | DCC_7 | DCC_8;    //if enabld discharge cell
     ltcBat.batConf.dischargeCellCfgA5 = DCC_9 | DCC_10| DCC_10| DCC_11 | DCC_12;
     ltcBat.batConf.dischargeCellCfgB0 = DCC_13 | DCC_14 | DCC_15;
     ltcBat.batConf.dischargeCellCfgB1 = DCC_0;
-
-    ltcBat.batConf.dischargeTime = DIS_60_MIN;
-
-    ltcBat.batConf.dischargeTimeMonitor = true;
 
     AE_ltcInit(spiReg, &ltcBat);
 }
