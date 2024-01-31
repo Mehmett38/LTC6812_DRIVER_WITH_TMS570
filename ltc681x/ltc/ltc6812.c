@@ -1,27 +1,21 @@
-/*
- * ltc6812.c
- *
- *  Created on: 19 Oca 2024
- *      Author: mehmet.dincer
+/**
+ * @brief ltc6812.c
+ * @data 19 Oca 2024
+ * @author: Mehmet Dinçer
  */
 
 
-
 #include "ltc6812.h"
-#include "crc15.h"
-
-//<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<-MACROS->>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-
 
 //<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<-GLOBAL VARIABLES->>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 uint16_t txBuffer[256];
 uint16_t rxBuffer[256];
 volatile uint32_t uwTick;
-static spiBASE_t * ltcSpi_ps;     // spi base address
-uint8_t slaveNumber;              // bms total connection
-static uint16_t i;                // counter
-uint16_t dummy_u16 = 0xFF;        // dummy variable
-spiDAT1_t spiDat_s =              // spi configuration parameters
+static spiBASE_t * ltcSpi_ps;                                           // spi base address
+uint8_t slaveNumber;                                                    // bms total connection
+static uint16_t i;                                                      // counter
+uint16_t dummy_u16 = 0xFF;                                              // dummy variable
+spiDAT1_t spiDat_s =                                                    // spi configuration parameters
 {
      .CSNR = 0,
      .CS_HOLD = 1,
@@ -40,11 +34,11 @@ spiDAT1_t spiDat_s =              // spi configuration parameters
 void AE_ltcInit(spiBASE_t * spi, Ltc682x * ltcBat)
 {
     spiInit();
-    init_PEC15_Table(); //!< Crc start table
+    init_PEC15_Table();                                                 //!< Crc start table
 
-    hetInit();
-    _enable_interrupt_();
-    pwmEnableNotification(hetREG1, pwm0, pwmEND_OF_PERIOD);
+    hetInit();                                                          // for pwm
+    _enable_interrupt_();                                               // global interrupt enable
+    pwmEnableNotification(hetREG1, pwm0, pwmEND_OF_PERIOD);             // to delay microsecond and microsecond used pwm period interrupt
     pwmStart(hetRAM1, pwm0);
 
     ltcSpi_ps = spi;
@@ -54,17 +48,19 @@ void AE_ltcInit(spiBASE_t * spi, Ltc682x * ltcBat)
     memset(&ltcBat->cfgBr, 0, sizeof(CFGBR));
 
     //!< configuration register A
-    ltcBat->cfgAr.CFGAR0.ADCOPT |= ltcBat->batConf.adcopt;
-    ltcBat->cfgAr.CFGAR0.REFON |= ltcBat->batConf.refon;
-    ltcBat->cfgAr.CFGAR0.cfg |= ltcBat->batConf.gioAPullOffPin;
+    ltcBat->cfgAr.CFGAR0.ADCOPT |= ltcBat->batConf.adcopt;              // adc speed mode selection
+    ltcBat->cfgAr.CFGAR0.REFON |= ltcBat->batConf.refon;                // power up untill watchdog
+    ltcBat->cfgAr.CFGAR0.cfg |= ltcBat->batConf.gioAPullOffPin << 2;    // GPIO1 located 1st index and Register start location
+                                                                        // at 3th index so we must shift 2 bit left
 
     //!< configuration register B
-    ltcBat->cfgBr.CFGBR0.cfg |= (ltcBat->batConf.gioBPullOffPin) & 0x000F;
+    ltcBat->cfgBr.CFGBR0.cfg |= ltcBat->batConf.gioBPullOffPin >> 6;    // GPIO6 located 6th index and Register start location
+                                                                        // at 0th index so we must shift 6 bit right
 
     ltcBat->cfgBr.CFGBR1.DTMEN |= ltcBat->batConf.dischargeTimeMonitor;
 
-    AE_ltcWrite((uint16_t*)&ltcBat->cfgAr, cmdWRCFGA_pu16);
-    AE_ltcWrite((uint16_t*)&ltcBat->cfgBr, cmdWRCFGB_pu16);
+    AE_ltcWrite((uint16_t*)&ltcBat->cfgAr, cmdWRCFGA_pu16);             // write to configuration register
+    AE_ltcWrite((uint16_t*)&ltcBat->cfgBr, cmdWRCFGB_pu16);             // write to configuration register
 }
 
 /**
@@ -75,26 +71,25 @@ void AE_ltcInit(spiBASE_t * spi, Ltc682x * ltcBat)
  */
 void AE_ltcWrite(uint16_t * txData, uint16_t cmd[4])
 {
-    uint8_t bufferLen = 4 + slaveNumber * 8;    // 4 = crc, 8 = 6 byte data + 2 byte crc
+    uint8_t bufferLen = CMD_LEN + slaveNumber * TRANSMIT_LEN;           // 4 = cmd, 8 = 6 byte data + 2 byte crc
+    uint8_t j;
+    uint16_t pec;
 
-    for(i = 0; i < 4; i++)
+    for(i = 0; i < CMD_LEN; i++)                                        // assign command and command pec
     {
         txBuffer[i] = cmd[i];
     }
 
-    uint8_t j;
-    uint16_t pec;
-
     for(i = 0; i < slaveNumber; i++)
     {
-        for(j = 0; j < TRANSMIT_LEN; j++)
+        for(j = 0; j < REGISTER_LEN; j++)
         {
-            txBuffer[4 + 8 * i + j] = txData[i * TRANSMIT_LEN + j];
+            txBuffer[CMD_LEN + TRANSMIT_LEN * i + j] = txData[i * REGISTER_LEN + j];
         }
 
         pec = AE_pec15((uint8_t*)&txData[i * TRANSMIT_LEN], 6);
-        txBuffer[4 + 8 * i + 6] = (pec >> 8) & 0xFF;
-        txBuffer[4 + 8 * i + 7] = (pec >> 0) & 0xFF;
+        txBuffer[CMD_LEN + TRANSMIT_LEN * i + 6] = (pec >> 8) & 0xFF;   // +6 = pec0 index
+        txBuffer[CMD_LEN + TRANSMIT_LEN * i + 7] = (pec >> 0) & 0xFF;   // +7 = pec1 index
     }
 
     AE_ltcWakeUpSleep();
@@ -102,6 +97,24 @@ void AE_ltcWrite(uint16_t * txData, uint16_t cmd[4])
     AE_LTC_CS_ON();
 
     spiTransmitData(ltcSpi_ps, &spiDat_s, bufferLen, txBuffer);
+
+    AE_LTC_CS_OFF();
+
+    AE_delayTenUs(1);   //!< 10us delay
+}
+
+/**
+ * @brief write the cmd command
+ * @param[in] cmd + pec
+ * @return none
+ */
+void AE_ltcCmdWrite(uint16_t cmd[4])
+{
+    AE_ltcWakeUpSleep();
+
+    AE_LTC_CS_ON();
+
+    spiTransmitData(ltcSpi_ps, &spiDat_s, CMD_LEN, cmd);
 
     AE_LTC_CS_OFF();
 
@@ -131,19 +144,38 @@ LTC_status AE_ltcRead(uint16_t * rxData, uint16_t cmd[4])
     uint8_t j;
     for(i = 0; i < slaveNumber; i++)
     {
-        uint16_t pec = AE_pec15((uint8_t*)&rxBuffer[RECEIVE_LEN * i], 6);
+        uint16_t pec = AE_pec15((uint8_t*)&rxBuffer[RECEIVE_LEN * i], REGISTER_LEN);        // calculate the crc of the first 6 index
 
-        uint16_t readPec = rxBuffer[RECEIVE_LEN * i + 6] << 8 | rxBuffer[RECEIVE_LEN * i + 7];
+        uint16_t readPec = (rxBuffer[RECEIVE_LEN * i + 6] << 8) | (rxBuffer[RECEIVE_LEN * i + 7]);
 
         if(pec != readPec) return LTC_WRONG_CRC;
 
         for(j = 0; j < RECEIVE_LEN; j++)
         {
-            rxData[j] = rxBuffer[RECEIVE_LEN * i + j];
+            rxData[j] = rxBuffer[RECEIVE_LEN * i + j];  //!NOTE çoklu slave için rxData[i][j] eklenecek
         }
     }
 
     return LTC_OK;
+}
+
+/**
+ * @brief read the some specific register
+ * @param[in] cmd + pec
+ * @return register value
+ */
+uint16_t AE_ltcCmdRead(uint16_t cmd[4])
+{
+    uint16_t returnVal;
+
+    AE_LTC_CS_ON();
+
+    spiTransmitData(ltcSpi_ps, &spiDat_s, 4, cmd);
+    spiReceiveData(ltcSpi_ps, &spiDat_s, 1, &returnVal);
+
+    AE_LTC_CS_OFF();
+
+    return returnVal;
 }
 
 /**
@@ -161,11 +193,11 @@ void AE_ltcWakeUpSleep()
         AE_LTC_CS_OFF();
     }
 
-    AE_delayTenUs(10);  //!< 300us delay
+    AE_delayTenUs(10);                                          //!< 100us delay, t-wake time
 }
 
 /**
- * @brief Wake isoSPI up from IDlE state and enters the READY state
+ * @brief isoSPI wake up from idle state and enters the READY state
  * @return none
  */
 void AE_ltcWakeUpIdle()
@@ -178,6 +210,7 @@ void AE_ltcWakeUpIdle()
 
         AE_LTC_CS_OFF();
     }
+    AE_delayTenUs(1);                                           //!< 10us delay, t-ready time
 }
 
 /**
@@ -188,14 +221,14 @@ void AE_ltcWakeUpIdle()
 LTC_status AE_ltcReadCellVoltage(Ltc682x * ltcBat)
 {
     LTC_status status;
-    float * fptr = (float*)&ltcBat->volt.cell1;
+    float * fptr = (float*)&ltcBat->volt.cell1;                 // To access each index separately
 
     //!< voltage register Group A
     status = AE_ltcRead(rxBuffer, cmdRDCVA_pu16);
     if(status == LTC_WRONG_CRC) return status;
 
     for(i = 0; i < 3; i++)
-    {   //offset + 12
+    {   //offset = 0
         fptr[i] = ((rxBuffer[i*2] << 0) | (rxBuffer[i*2 + 1] << 8)) / 10000.0;  //!< 10000 comes from datasheet
     }
 
@@ -204,7 +237,7 @@ LTC_status AE_ltcReadCellVoltage(Ltc682x * ltcBat)
     if(status == LTC_WRONG_CRC) return status;
 
     for(i = 0; i < 3; i++)
-    {   //offset + 12
+    {   //offset = 3
         fptr[i + 3] = ((rxBuffer[i*2] << 0) | (rxBuffer[i*2 + 1] << 8)) / 10000.0;  //!< 10000 comes from datasheet
     }
 
@@ -213,7 +246,7 @@ LTC_status AE_ltcReadCellVoltage(Ltc682x * ltcBat)
     if(status == LTC_WRONG_CRC) return status;
 
     for(i = 0; i < 3; i++)
-    {   //offset + 12
+    {   //offset = 6
         fptr[i + 6] = ((rxBuffer[i*2] << 0) | (rxBuffer[i*2 + 1] << 8)) / 10000.0;  //!< 10000 comes from datasheet
     }
 
@@ -222,7 +255,7 @@ LTC_status AE_ltcReadCellVoltage(Ltc682x * ltcBat)
     if(status == LTC_WRONG_CRC) return status;
 
     for(i = 0; i < 3; i++)
-    {   //offset + 12
+    {   //offset = 9
         fptr[i + 9] = ((rxBuffer[i*2] << 0) | (rxBuffer[i*2 + 1] << 8)) / 10000.0;  //!< 10000 comes from datasheet
     }
 
@@ -231,11 +264,38 @@ LTC_status AE_ltcReadCellVoltage(Ltc682x * ltcBat)
     if(status == LTC_WRONG_CRC) return status;
 
     for(i = 0; i < 3; i++)
-    {   //offset + 12
+    {   //offset = 12
         fptr[i + 12] = ((rxBuffer[i*2] << 0) | (rxBuffer[i*2 + 1] << 8)) / 10000.0;  //!< 10000 comes from datasheet
     }
 
     return status;
+}
+
+/**
+ * @brief configure under and overvoltage values
+ * @param[in] bms global variable
+ * @param[in] undervoltage value
+ * @param[in] overvoltage value
+ * @return none
+ */
+void AE_ltcSetUnderOverVoltage(Ltc682x * ltcBat, float underVolt, float overVolt)
+{
+    uint16_t underVoltTemp = underVolt * 625.0 - 1;
+    uint16_t overVoltTemp = overVolt * 625;
+
+    // clear voltage set register
+    ltcBat->cfgAr.CFGAR1.cfg = 0;
+    ltcBat->cfgAr.CFGAR2.cfg = 0;
+    ltcBat->cfgAr.CFGAR3.cfg = 0;
+
+    // configure the voltage
+    ltcBat->cfgAr.CFGAR1.cfg |= underVoltTemp & 0x00FF;
+    ltcBat->cfgAr.CFGAR2.cfg |= (underVoltTemp >> 8) & 0x000F;
+
+    ltcBat->cfgAr.CFGAR2.cfg |= (overVoltTemp << 4) & 0x00F0;
+    ltcBat->cfgAr.CFGAR3.cfg |= (overVoltTemp >> 4) & 0x00FF;
+
+    AE_ltcWrite((uint16_t*)&ltcBat->cfgAr, cmdWRCFGA_pu16);
 }
 
 /**
@@ -245,7 +305,7 @@ LTC_status AE_ltcReadCellVoltage(Ltc682x * ltcBat)
  * @param[in] cell selection for adc conversion for parameter search @refgroup CH
  * @return if crc is suitable with message retur ok else crcError
  */
-void AE_ltcStartCellAdc(Ltc682x * ltcBat, AdcMode adcMode, uint8_t dischargePermit, uint8_t CELL)
+void AE_ltcStartCellAdc(Ltc682x * ltcBat, AdcMode adcMode, uint8_t dischargePermit, uint8_t CELL_)
 {
     uint16_t adcvReg = 0x0260;   //!< base value of ADCV register
 
@@ -260,7 +320,7 @@ void AE_ltcStartCellAdc(Ltc682x * ltcBat, AdcMode adcMode, uint8_t dischargePerm
 
     adcvReg |= (adcMode << 7);
     adcvReg |= (dischargePermit << 4);
-    adcvReg |= CELL;
+    adcvReg |= CELL_;
 
     uint16_t cmd[4] = {0};
     uint16_t pec;
@@ -271,11 +331,7 @@ void AE_ltcStartCellAdc(Ltc682x * ltcBat, AdcMode adcMode, uint8_t dischargePerm
     cmd[2] = (pec >> 8) & 0x00FF;
     cmd[3] = (pec >> 0) & 0x00FF;
 
-    AE_ltcWakeUpSleep();
-
-    AE_LTC_CS_ON();
-    spiTransmitData(spiREG1, &spiDat_s, 4, cmd);
-    AE_LTC_CS_OFF();
+    AE_ltcCmdWrite(cmd);
 }
 
 /**
@@ -284,17 +340,8 @@ void AE_ltcStartCellAdc(Ltc682x * ltcBat, AdcMode adcMode, uint8_t dischargePerm
  */
 uint8_t AE_ltcAdcMeasureState()
 {
-    uint16_t cmd[4] = {0x07, 0x14, 0xF3, 0x6C};
-    uint16_t returnVal;
-
-    AE_LTC_CS_ON();
-
-    spiTransmitData(ltcSpi_ps, &spiDat_s, 4, cmd);
-    spiReceiveData(ltcSpi_ps, &spiDat_s, 1, &returnVal);
-
-    AE_LTC_CS_OFF();
-
-    return (uint8_t)returnVal;
+    uint8_t status = (uint8_t)AE_ltcCmdRead(cmdPladc_pu16);
+    return status;
 }
 
 /**
@@ -329,13 +376,7 @@ void AE_ltcStartGpioAdc(Ltc682x * ltcBat, AdcMode adcMode, uint8_t GPIO_)
     cmd[2] = (pec & 0xFF00) >> 8;
     cmd[3] = (pec & 0x00FF) >> 0;
 
-    AE_ltcWakeUpSleep();
-
-    AE_LTC_CS_ON();
-
-    spiTransmitData(ltcSpi_ps, &spiDat_s, 4, cmd);
-
-    AE_LTC_CS_OFF();
+    AE_ltcCmdWrite(cmd);
 }
 
 /**
@@ -418,13 +459,7 @@ void AE_ltcStartStatusAdc(Ltc682x * ltcBat, AdcMode adcMode, uint8_t CHST_)
     cmd[2] = (pec & 0xFF00) >> 8;
     cmd[3] = (pec & 0x00FF) >> 0;
 
-    AE_ltcWakeUpSleep();
-
-    AE_LTC_CS_ON();
-
-    spiTransmitData(ltcSpi_ps, &spiDat_s, 4, cmd);
-
-    AE_LTC_CS_OFF();
+    AE_ltcCmdWrite(cmd);
 }
 
 /**
@@ -500,13 +535,7 @@ LTC_status AE_ltcClearCellAdc()
     Ltc682x ltcTemp;
     LTC_status status;
 
-    AE_ltcWakeUpSleep();
-
-    AE_LTC_CS_ON();
-
-    spiTransmitData(ltcSpi_ps, &spiDat_s, 4, cmdCLRCELL_pu16);
-
-    AE_LTC_CS_OFF();
+    AE_ltcCmdWrite(cmdCLRCELL_pu16);
 
     status = AE_ltcReadCellVoltage(&ltcTemp);
     if(status == LTC_WRONG_CRC) return status;
@@ -526,13 +555,7 @@ LTC_status AE_ltcClearGpioAdc(Ltc682x * ltcBat)
 {
     LTC_status status;
 
-    AE_ltcWakeUpSleep();
-
-    AE_LTC_CS_ON();
-
-    spiTransmitData(ltcSpi_ps, &spiDat_s, 4, cmdCLRAUX_pu16);
-
-    AE_LTC_CS_OFF();
+    AE_ltcCmdWrite(cmdCLRAUX_pu16);
 
     status = AE_ltcReadGPIOVoltage(ltcBat);
     if(status == LTC_WRONG_CRC) return status;
@@ -552,13 +575,7 @@ LTC_status AE_ltcClearStatusAdc(Ltc682x * ltcBat)
 {
     LTC_status status;
 
-    AE_ltcWakeUpSleep();
-
-    AE_LTC_CS_ON();
-
-    spiTransmitData(ltcSpi_ps, &spiDat_s, 4, cmdCLRSTAT_pu16);
-
-    AE_LTC_CS_OFF();
+    AE_ltcCmdWrite(cmdCLRSTAT_pu16);
 
     status = AE_ltcReadStatusRegA(ltcBat);
     if(status == LTC_WRONG_CRC) return status;
@@ -578,12 +595,12 @@ LTC_status AE_ltcClearStatusAdc(Ltc682x * ltcBat)
  */
 void AE_ltcStartPwm(Ltc682x * ltcBat, uint16_t S_PIN_, uint8_t PWM_DUTY_LEVEL_)
 {
-    uint16_t pwmDuty[12] = {0};   //!< pwm blocks valid on PWM Register Group and PWM/S Control Register Group B
-                            //!< so, send 12 bytes data
+    uint16_t pwmDuty[12] = {0};         //!< pwm blocks valid on PWM Register Group and PWM/S Control Register Group B
+                                        //!< so, send 12 bytes data
     uint8_t mode = 0;
     uint8_t index = 0;
 
-    for(i = 0; i < 15; i++) //!< 15 == S pin number
+    for(i = 0; i < 15; i++)             //!< 15 == S pin number
     {
         if((S_PIN_ >> i) & 0x01)
         {
@@ -599,28 +616,13 @@ void AE_ltcStartPwm(Ltc682x * ltcBat, uint16_t S_PIN_, uint8_t PWM_DUTY_LEVEL_)
 }
 
 /**
- * @brief if pwm
- */
-LTC_status AE_ltcReadStatusPwm(Ltc682x * ltcBat)
-{
-    LTC_status status = LTC_WRONG_CRC;
-    return status;
-}
-
-/**
  * @brief if pwm is started pause the pw
  * @param[in] bms global variable
  * @return none
  */
 void AE_ltcPausePwm(Ltc682x * ltcBat)
 {
-    AE_ltcWakeUpSleep();
-
-    AE_LTC_CS_ON();
-
-    spiTransmitData(ltcSpi_ps, &spiDat_s, 4, cmdMute_pu16);
-
-    AE_LTC_CS_OFF();
+    AE_ltcCmdWrite(cmdMute_pu16);
 }
 
 /*
@@ -630,13 +632,7 @@ void AE_ltcPausePwm(Ltc682x * ltcBat)
  */
 void AE_ltcContinuePwm(Ltc682x * ltcBat)
 {
-    AE_ltcWakeUpSleep();
-
-    AE_LTC_CS_ON();
-
-    spiTransmitData(ltcSpi_ps, &spiDat_s, 4, cmdUnMute_pu16);
-
-    AE_LTC_CS_OFF();
+    AE_ltcCmdWrite(cmdUnMute_pu16);
 }
 
 /**
@@ -650,12 +646,13 @@ void AE_ltcContinuePwm(Ltc682x * ltcBat)
  */
 void AE_ltcSetBalance(Ltc682x * ltcBat, DischargeTime DIS_, float underVolt, float overVolt, uint16_t DCC_)
 {
-    uint16_t underVoltTemp;     // (VUV + 1) * 16 * 10uV
-    uint16_t overVoltTemp;      // VOV * 16 * 10uV
     uint16_t maskedDCC;
 
-    underVoltTemp = underVolt * 625.0 - 1;
-    overVoltTemp = overVolt * 625;
+    // clear related bits
+    ltcBat->cfgAr.CFGAR4.cfg &= 0x00;
+    ltcBat->cfgAr.CFGAR5.cfg &= 0x00;
+    ltcBat->cfgBr.CFGBR0.cfg &= 0x8F;
+    ltcBat->cfgBr.CFGBR1.cfg &= 0xFB;
 
     //DCC pins are scattered in several registers so we must mask them
     //Register Group A, CFGRA4 Mask = pin1-8    0x1FE
@@ -668,6 +665,9 @@ void AE_ltcSetBalance(Ltc682x * ltcBat, DischargeTime DIS_, float underVolt, flo
     maskedDCC >>= 9;            //pin9 start index 9 and dcc9 located 0th index in register
     ltcBat->cfgAr.CFGAR5.cfg |= maskedDCC;
 
+    //set discharge duration
+    ltcBat->cfgAr.CFGAR5.cfg |= (DIS_ << 4) & 0x00F0;
+
     //Register Group B, CFGBR0 Mask = pin13-15    0xE000
     maskedDCC = DCC_ & 0xE000;
     maskedDCC >>= 9;            //pin13 start index 13 and dcc13 located 4th index in register (13 - 4)
@@ -678,16 +678,8 @@ void AE_ltcSetBalance(Ltc682x * ltcBat, DischargeTime DIS_, float underVolt, flo
     maskedDCC <<= 2;            //pin0 start index 0 and dcc0 located 2th index in register (0 - 2)
     ltcBat->cfgBr.CFGBR1.cfg |= maskedDCC;
 
-
     //!< enable discharge monitoring and set under and over voltage
-    ltcBat->cfgAr.CFGAR1.cfg |= underVoltTemp & 0x00FF;
-    ltcBat->cfgAr.CFGAR2.cfg |= (underVoltTemp >> 8) & 0x000F;
-
-    ltcBat->cfgAr.CFGAR2.cfg |= (overVoltTemp << 4) & 0x00F0;
-    ltcBat->cfgAr.CFGAR3.cfg |= (overVoltTemp >> 4) & 0x00FF;
-
-    //set discharge duration
-    ltcBat->cfgAr.CFGAR5.cfg |= (DIS_ << 4) & 0x00F0;
+    AE_ltcSetUnderOverVoltage(ltcBat, underVolt, overVolt);
 
     AE_ltcWrite((uint16_t*)&ltcBat->cfgAr, cmdWRCFGA_pu16);
     AE_ltcWrite((uint16_t*)&ltcBat->cfgBr, cmdWRCFGB_pu16);
@@ -717,7 +709,7 @@ float AE_ltcMinCellVolt(Ltc682x * ltcBat)
  * @brief check for any open wires between the ADCs of the ltc681x
  * @param[in] bms global variable
  * @param[in] adc mode selection
- * @param[in] checked cell selection, for parameter search @refgroup CHG
+ * @param[in] checked cell selection, for parameter search @refgroup CH
  * @return if no error return OK else OPEN_WIRE
  */
 LTC_status AE_ltcIsCellOpenWire(Ltc682x * ltcBat, AdcMode adcMode, uint8_t CELL_)
@@ -728,7 +720,7 @@ LTC_status AE_ltcIsCellOpenWire(Ltc682x * ltcBat, AdcMode adcMode, uint8_t CELL_
     float * cellPu;
     float * cellPd;
 
-    uint16_t adow= 0x0228;    //!< ADSTAT base register
+    uint16_t adow= 0x0228;    //!< adow base register
     uint16_t cmd[4];
     uint16_t pec;
 
@@ -752,13 +744,11 @@ LTC_status AE_ltcIsCellOpenWire(Ltc682x * ltcBat, AdcMode adcMode, uint8_t CELL_
     cmd[2] = (pec & 0xFF00) >> 8;
     cmd[3] = (pec & 0x00FF) >> 0;
 
-    AE_ltcWakeUpSleep();
+    AE_ltcClearCellAdc();
 
-    AE_LTC_CS_ON();
+    AE_ltcCmdRead(cmd);
+    AE_ltcCmdRead(cmd);
 
-    spiTransmitData(ltcSpi_ps, &spiDat_s, 4, cmd);
-
-    AE_LTC_CS_OFF();
 
     while(!AE_ltcAdcMeasureState());
     status = AE_ltcReadCellVoltage(&bmsTest1);
@@ -773,19 +763,18 @@ LTC_status AE_ltcIsCellOpenWire(Ltc682x * ltcBat, AdcMode adcMode, uint8_t CELL_
     cmd[2] = (pec & 0xFF00) >> 8;
     cmd[3] = (pec & 0x00FF) >> 0;
 
-    AE_LTC_CS_ON();
+    AE_ltcClearCellAdc();
 
-    spiTransmitData(ltcSpi_ps, &spiDat_s, 4, cmd);
-
-    AE_LTC_CS_OFF();
+    AE_ltcCmdRead(cmd);
+    AE_ltcCmdRead(cmd);
 
     while(!AE_ltcAdcMeasureState());
     status = AE_ltcReadCellVoltage(&bmsTest2);
     if(status == LTC_WRONG_CRC) return LTC_WRONG_CRC;
     cellPd = (float*)&bmsTest2.volt.cell1;
 
-    for(i = 1; i < 16; i++) //cell 2-15
-    {
+    for(i = 1; i < ltcBat->batConf.numberOfSerialCell; i++) //cell 2-15
+    {   // -0.400 comes from data sheet
         if((cellPu[i] - cellPd[i]) < -0.400)    return LTC_OPEN_WIRE;
     }
 
@@ -796,7 +785,7 @@ LTC_status AE_ltcIsCellOpenWire(Ltc682x * ltcBat, AdcMode adcMode, uint8_t CELL_
  * @brief check for any open wires between the ADCs of the ltc681x
  * @param[in] bms global variable
  * @param[in] adc mode selection
- * @param[in] checked cell selection, for parameter search @refgroup CHG
+ * @param[in] checked cell selection, for parameter search @refgroup CH
  * @return if no error return OK else OPEN_WIRE
  */
 LTC_status AE_ltcIsGpioOpenWire(Ltc682x * ltcBat, AdcMode adcMode, uint8_t CELL_)
@@ -807,7 +796,7 @@ LTC_status AE_ltcIsGpioOpenWire(Ltc682x * ltcBat, AdcMode adcMode, uint8_t CELL_
     float * gioPU;
     float * gioPd;
 
-    uint16_t axow= 0x0410;    //!< ADSTAT base register
+    uint16_t axow= 0x0410;    //!< axow base register
     uint16_t cmd[4];
     uint16_t pec;
 
@@ -869,6 +858,20 @@ LTC_status AE_ltcIsGpioOpenWire(Ltc682x * ltcBat, AdcMode adcMode, uint8_t CELL_
     }
 
     return LTC_OK;
+}
+
+/**
+ * @brief calculate the GPIO3 NTC temperature
+ * @param[in] bms global variable
+ * @return temperature in celcius
+ */
+double AE_ltcTemperature(Ltc682x * ltcBat)
+{
+    AE_ltcStartGpioAdc(ltcBat, MODE_7KHZ, GPIO_ALL);
+    while(!AE_ltcAdcMeasureState());
+    AE_ltcReadGPIOVoltage(ltcBat);
+
+    return AE_calculateTemp(ltcBat->gpio.gpio3, ltcBat->gpio.ref, PULL_DOWN);
 }
 
 /**

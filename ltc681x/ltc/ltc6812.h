@@ -1,8 +1,7 @@
 /**
- * ltc6812.h
- *
- *  @date 19 Oca 2024
- *  @author: mehmet.dincer
+ * @brief ltc6812.h
+ * @data 19 Oca 2024
+ * @author: Mehmet Dinçer
  */
 
 #ifndef LTC681X_LTC6812_H_
@@ -19,6 +18,8 @@
 #include "stdbool.h"
 #include "string.h"
 #include "stdlib.h"
+#include "math.h"
+#include "temperature.h"
 
 //<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<-MACROS->>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 #define WRITE_BYTES_IN_REG              (6)
@@ -28,18 +29,22 @@
 #define DISABLE                         (0)
 #define GPIO_A_RESET                    (0xF8)
 #define GPIO_B_RESET                    (0x0F)
-#define TRANSMIT_LEN                    (6)
+#define CMD_LEN                         (4)         //cmd packet len 4byte
+#define REGISTER_LEN                    (6)
+#define TRANSMIT_LEN                    (8)
 #define RECEIVE_LEN                     (8)
 
+#define CFGARO_GPIO1                    (3)         //index of GPIO1 parameter in register CFGRA0
+
 //!< @refgroup GPIOA
-#define GPIO_1                          (1 << 3)
-#define GPIO_2                          (1 << 4)
-#define GPIO_3                          (1 << 5)
-#define GPIO_4                          (1 << 6)
-#define GPIO_5                          (1 << 7)
-#define GPIO_6                          (1 << 0)
-#define GPIO_7                          (1 << 1)
-#define GPIO_8                          (1 << 2)
+#define GPIO_1                          (1 << 1)
+#define GPIO_2                          (1 << 2)
+#define GPIO_3                          (1 << 3)
+#define GPIO_4                          (1 << 4)
+#define GPIO_5                          (1 << 5)
+#define GPIO_6                          (1 << 6)
+#define GPIO_7                          (1 << 7)
+#define GPIO_8                          (1 << 8)
 
 //!< @refgroup dcc
 #define DCC_0                           (1 << 0)
@@ -334,8 +339,8 @@ typedef struct{
     uint8_t numberOfSlave;          // slave number
     bool adcopt;                    // using to configure system ADC read speed
     bool refon;                     // to understand better investigate the core working diagram
-    uint8_t gioAPullOffPin;         // @refgroup gioA   set as pull of
-    uint8_t gioBPullOffPin;         // @refgroup gioB   set as pull of
+    uint16_t gioAPullOffPin;         // @refgroup gioA   set as pull of
+    uint16_t gioBPullOffPin;         // @refgroup gioB   set as pull of
     bool dischargeTimeMonitor;
 }BatteryConf;
 
@@ -451,7 +456,7 @@ typedef struct{
 static uint16_t cmdWRCFGA_pu16[4]   = {0x00, 0x01, 0x3D, 0x6E}; // last 2 index CRC
 static uint16_t cmdWRCFGB_pu16[4]   = {0x00, 0x24, 0xB1, 0x9E};
 static uint16_t cmdRDCFGA_pu16[4]   = {0x00, 0x02, 0x2B, 0x0A};
-static uint16_t cmdRDCFGB_pu16[4]   = {0x00, 0x26, 0x2C, 0xC8}; // !note
+static uint16_t cmdRDCFGB_pu16[4]   = {0x00, 0x26, 0x2C, 0xC8};
 static uint16_t cmdRDCVA_pu16[4]    = {0x00, 0x04, 0x07, 0xC2};
 static uint16_t cmdRDCVB_pu16[4]    = {0x00, 0x06, 0x9A, 0x94};
 static uint16_t cmdRDCVC_pu16[4]    = {0x00, 0x08, 0x5E, 0x52};
@@ -461,48 +466,67 @@ static uint16_t cmdRDAUXA_pu16[4]   = {0x00, 0x0C, 0xEF, 0xCC};
 static uint16_t cmdRDAUXB_pu16[4]   = {0x00, 0x0E, 0x72, 0x9A};
 static uint16_t cmdRDAUXC_pu16[4]   = {0x00, 0x0D, 0x64, 0xFE};
 static uint16_t cmdRDAUXD_pu16[4]   = {0x00, 0x0F, 0xF9, 0xA8};
-static uint16_t cmdRDSTATA_pu16[4]  = {0x00, 0x10, 0xED, 0x72}; // !note
-static uint16_t cmdRDSTATB_pu16[4]  = {0x00, 0x12, 0x70, 0x24}; // !note
-static uint16_t cmdWRSCTRL_pu16[4]  = {0x00, 0x14, 0x5C, 0xEC}; // !note
-static uint16_t cmdWRPWM_pu16[4]    = {0x00, 0x20, 0x00, 0x00}; // !note
-static uint16_t cmdWRPSB_pu16[4]    = {0x00, 0x1C, 0xB4, 0xE2}; // !note
-static uint16_t cmdRDSCTRL_pu16[4]  = {0x00, 0x16, 0xC1, 0xBA}; // !note
-static uint16_t cmdRDPWM_pu16[4]    = {0x00, 0x22, 0x9D, 0x56}; // !note
-static uint16_t cmdRDPSB_pu16[4]    = {0x00, 0x1E, 0x29, 0xB4}; // !note
-static uint16_t cmdSTSCTRL_pu16[4]  = {0x00, 0x19, 0x8E, 0x4E}; // !note
-static uint16_t cmdCLRSCTRL_pu16[4] = {0x00, 0x18, 0x05, 0x7C}; // !note
+static uint16_t cmdRDSTATA_pu16[4]  = {0x00, 0x10, 0xED, 0x72};
+static uint16_t cmdRDSTATB_pu16[4]  = {0x00, 0x12, 0x70, 0x24};
+static uint16_t cmdWRSCTRL_pu16[4]  = {0x00, 0x14, 0x5C, 0xEC};
+static uint16_t cmdWRPWM_pu16[4]    = {0x00, 0x20, 0x00, 0x00};
+static uint16_t cmdWRPSB_pu16[4]    = {0x00, 0x1C, 0xB4, 0xE2};
+static uint16_t cmdRDSCTRL_pu16[4]  = {0x00, 0x16, 0xC1, 0xBA};
+static uint16_t cmdRDPWM_pu16[4]    = {0x00, 0x22, 0x9D, 0x56};
+static uint16_t cmdRDPSB_pu16[4]    = {0x00, 0x1E, 0x29, 0xB4};
+static uint16_t cmdSTSCTRL_pu16[4]  = {0x00, 0x19, 0x8E, 0x4E};
+static uint16_t cmdCLRSCTRL_pu16[4] = {0x00, 0x18, 0x05, 0x7C};
 static uint16_t cmdCLRCELL_pu16[4]  = {0x07, 0x11, 0xC9, 0xC0};
 static uint16_t cmdCLRAUX_pu16[4]   = {0x07, 0x12, 0xDF, 0xA4};
 static uint16_t cmdCLRSTAT_pu16[4]  = {0x07, 0x13, 0x54, 0x96};
 static uint16_t cmdMute_pu16[4]     = {0x00, 0x28, 0xE8, 0x0E};
 static uint16_t cmdUnMute_pu16[4]   = {0x00, 0x29, 0x63, 0x3C};
+static uint16_t cmdPladc_pu16[4]    = {0x07, 0x14, 0xF3, 0x6C};
+static uint16_t cmdClrCell_pu16[4]  = {0x07, 0x11, 0xC9, 0xC0};
 
+static uint16_t cmdAdstat_pu16[4]   = {0x04, 0x68, 0xB3, 0xE2};
 
 //<<<<<<<<<<<<<<<<<<<<<<<<<-FUNCTION PROTOTYPES->>>>>>>>>>>>>>>>>>>>>>>>>>
 void AE_ltcInit(spiBASE_t * spi, Ltc682x * ltcBat);
+
 void AE_ltcWrite(uint16_t * txData, uint16_t cmd[4]);
+void AE_ltcCmdWrite(uint16_t cmd[4]);
+
 LTC_status AE_ltcRead(uint16_t * rxData, uint16_t cmd[4]);
+uint16_t AE_ltcCmdRead(uint16_t cmd[4]);
+
 void AE_ltcWakeUpSleep();
 void AE_ltcWakeUpIdle();
+
 uint8_t AE_ltcAdcMeasureState();
+
 void AE_ltcStartCellAdc(Ltc682x * ltcBat, AdcMode adcMode, uint8_t dischargePermit, uint8_t selectedCell);
 LTC_status AE_ltcReadCellVoltage(Ltc682x * ltcBat);
+LTC_status AE_ltcClearCellAdc();
+
+void AE_ltcSetUnderOverVoltage(Ltc682x * ltcBat, float underVolt, float overVolt);
+
 void AE_ltcStartGpioAdc(Ltc682x * ltcBat, AdcMode adcMode, uint8_t GPIO_);
 LTC_status AE_ltcReadGPIOVoltage(Ltc682x * ltcBat);
+LTC_status AE_ltcClearGpioAdc(Ltc682x * ltcBat);
+
 void AE_ltcStartStatusAdc(Ltc682x * ltcBat, AdcMode adcMode, uint8_t GPIO_);
 LTC_status AE_ltcReadStatusRegA(Ltc682x * ltcBat);
 LTC_status AE_ltcReadStatusRegB(Ltc682x * ltcBat);
-LTC_status AE_ltcClearCellAdc();
-LTC_status AE_ltcClearGpioAdc(Ltc682x * ltcBat);
 LTC_status AE_ltcClearStatusAdc(Ltc682x * ltcBat);
+
 void AE_ltcStartPwm(Ltc682x * ltcBat, uint16_t S_PIN_, uint8_t PWM_DUTY_LEVEL_);
 void AE_ltcPausePwm(Ltc682x * ltcBat);
 void AE_ltcContinuePwm(Ltc682x * ltcBat);
-LTC_status AE_ltcReadStatusPwm(Ltc682x * ltcBat);
+
 void AE_ltcSetBalance(Ltc682x * ltcBat, DischargeTime DIS_, float underVolt, float overVolt, uint16_t DCC_);
 float AE_ltcMinCellVolt(Ltc682x * ltcBat);
+
 LTC_status AE_ltcIsCellOpenWire(Ltc682x * ltcBat, AdcMode adcMode, uint8_t CELL_);
 LTC_status AE_ltcIsGpioOpenWire(Ltc682x * ltcBat, AdcMode adcMode, uint8_t CELL_);
+
+double AE_ltcTemperature(Ltc682x * ltcBat);
+
 static void AE_ltcTick(uint32_t );
 uint32_t getUsTick();
 void AE_delayMs(uint32_t delay_u32);

@@ -114,4 +114,5 @@ SUBDIRS := \
 009_Ltc6812/source \
 ltc681x/crc \
 ltc681x/ltc \
+ltc681x/temperature \
 

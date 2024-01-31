@@ -27,6 +27,10 @@ ltc681x/ltc/ltc6812.obj: C:/Users/mehmet.dincer/Desktop/MehDin/codeComposer/009_
 ltc681x/ltc/ltc6812.obj: C:/Users/mehmet.dincer/Desktop/MehDin/codeComposer/009_Ltc6812/009_Ltc6812/include/gio.h
 ltc681x/ltc/ltc6812.obj: C:/Users/mehmet.dincer/Desktop/MehDin/codeComposer/009_Ltc6812/ltc681x/crc/crc15.h
 ltc681x/ltc/ltc6812.obj: C:/ti/ccs1120/ccs/tools/compiler/ti-cgt-arm_20.2.5.LTS/include/stdlib.h
+ltc681x/ltc/ltc6812.obj: C:/ti/ccs1120/ccs/tools/compiler/ti-cgt-arm_20.2.5.LTS/include/math.h
+ltc681x/ltc/ltc6812.obj: C:/ti/ccs1120/ccs/tools/compiler/ti-cgt-arm_20.2.5.LTS/include/_defs.h
+ltc681x/ltc/ltc6812.obj: C:/ti/ccs1120/ccs/tools/compiler/ti-cgt-arm_20.2.5.LTS/include/machine/_limits.h
+ltc681x/ltc/ltc6812.obj: C:/Users/mehmet.dincer/Desktop/MehDin/codeComposer/009_Ltc6812/ltc681x/temperature/temperature.h
 
 ../ltc681x/ltc/ltc6812.c:
 
@@ -81,4 +85,12 @@ C:/Users/mehmet.dincer/Desktop/MehDin/codeComposer/009_Ltc6812/009_Ltc6812/inclu
 C:/Users/mehmet.dincer/Desktop/MehDin/codeComposer/009_Ltc6812/ltc681x/crc/crc15.h:
 
 C:/ti/ccs1120/ccs/tools/compiler/ti-cgt-arm_20.2.5.LTS/include/stdlib.h:
+
+C:/ti/ccs1120/ccs/tools/compiler/ti-cgt-arm_20.2.5.LTS/include/math.h:
+
+C:/ti/ccs1120/ccs/tools/compiler/ti-cgt-arm_20.2.5.LTS/include/_defs.h:
+
+C:/ti/ccs1120/ccs/tools/compiler/ti-cgt-arm_20.2.5.LTS/include/machine/_limits.h:
+
+C:/Users/mehmet.dincer/Desktop/MehDin/codeComposer/009_Ltc6812/ltc681x/temperature/temperature.h:
 

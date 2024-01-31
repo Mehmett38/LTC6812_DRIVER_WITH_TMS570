@@ -71,6 +71,7 @@ void ltcInit(spiBASE_t * spiReg);
 #define UNUSED(x)   ((void)x)
 uint8_t toggle = 1;
 uint8_t returnVarningClose;
+double temperature;
 
 /* USER CODE END */
 
@@ -115,26 +116,22 @@ int main(void)
     LTC_status status;
 
 
+    AE_delayMs(2);  // t-wakeup time
 
-    AE_delayMs(2);  // Twakeup time
-
-#if 1               // read the lowest cell voltage and balance the other cell up to this level
+#if 0               // read the lowest cell voltage and balance the other cell up to this level
     AE_ltcStartCellAdc(&ltcBat, MODE_7KHZ, true, CELL_ALL);
     //!< check adcMeasure duration is completed
     while(!AE_ltcAdcMeasureState());
     status = AE_ltcReadCellVoltage(&ltcBat);
     status = AE_ltcClearCellAdc();
 
-    AE_ltcSetBalance(&ltcBat, DIS_90_MIN, AE_ltcMinCellVolt(&ltcBat), 4.2, DCC_ALL);
-    AE_ltcStartPwm(&ltcBat, S_PIN_ALL, PWM_DUTY_LEVEL_14);
+    AE_ltcSetBalance(&ltcBat, DIS_5_MIN, AE_ltcMinCellVolt(&ltcBat), 4.2, DCC_ALL);
+    AE_ltcStartPwm(&ltcBat, S_PIN_ALL, PWM_DUTY_LEVEL_10);
 #endif
-
 
     while(1)
     {
-
-
-#if 0   // open wire check
+#if 0   // open wire check !NOT TESTED
         status = AE_ltcIsCellOpenWire(&ltcBat, MODE_7KHZ, CELL_ALL);
         status = AE_ltcIsGpioOpenWire(&ltcBat, MODE_7KHZ, CELL_ALL);
 #endif
@@ -148,7 +145,7 @@ int main(void)
 
 #if 0   // GPIO voltage Measure
         AE_ltcStartGpioAdc(&ltcBat, MODE_7KHZ, GPIO_ALL);
-        while(!AE_ltcAdcM   easureState());
+        while(!AE_ltcAdcMeasureState());
         AE_ltcReadGPIOVoltage(&ltcBat);
 #endif
 
@@ -193,7 +190,7 @@ int main(void)
         AE_ltcReadStatusRegA(&ltcBat);
         AE_ltcReadStatusRegB(&ltcBat);
 
-        if(ltcBat->statusRegA.internalDieTemp > 150)    //configuration register is reset
+        if(ltcBat.statusRegA.internalDieTemp > 150)    //configuration register is reset
         {
             /*the thermal shutdown circuit trips and resets the Configuration
              * Register Groups (except the MUTE bit) and turns off all discharge switches.*/
@@ -215,12 +212,42 @@ int main(void)
         AE_ltcContinuePwm(&ltcBat);     // continue if pwm is paused
 #endif
 
-#if 0    //LTC6812-1 has 3 clear ADC commands: CLRCELL, CLRAUX and CLRSTAT
+#if 0    // close the adc, LTC6812-1 has 3 clear ADC commands: CLRCELL, CLRAUX and CLRSTAT
         status = AE_ltcClearCellAdc(&ltcBat);
         status = AE_ltcClearGpioAdc(&ltcBat);
         status = AE_ltcClearStatusAdc(&ltcBat);
 #endif
 
+#if 0   // read GPIO3 temperature
+        temperature = AE_ltcTemperature(&ltcBat);
+#endif
+
+#if 0   // !!!Not working cell limit control
+        AE_ltcStartCellAdc(&ltcBat, MODE_7KHZ, true, CELL_ALL);
+        //!< check adcMeasure duration is completed
+        while(!AE_ltcAdcMeasureState());
+        status = AE_ltcReadCellVoltage(&ltcBat);
+
+        AE_ltcSetUnderOverVoltage(&ltcBat, 3.0f, 4.2f);
+
+        AE_ltcStartStatusAdc(&ltcBat, MODE_7KHZ, CHST_ALL);
+        while(!AE_ltcAdcMeasureState());
+        AE_ltcReadStatusRegA(&ltcBat);
+        AE_ltcReadStatusRegB(&ltcBat);
+
+        uint8_t statusCell1 = ltcBat.statusRegB.CellOverFlag.cell1;
+        if(statusCell1)
+        {
+            //cell1 exceed the overvoltage limit
+        }
+
+        statusCell1 = ltcBat.statusRegB.CellUnderFlag.cell1;
+        if(statusCell1)
+        {
+            //cell1 below the undervoltage limit
+        }
+
+#endif
         //<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<BEFORE WORKING LTC>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
         #if 0   // code testing V1.1    working successfully
@@ -258,7 +285,6 @@ int main(void)
 
         #endif
 
-
         #if 0   //!< ltc6820 data transfer
 
         AE_LTC_CS_ON();
@@ -275,7 +301,6 @@ int main(void)
             LTC_status ltcStatus = AE_ltcRDCFG(&cellInf, RDCFGA);
 
         #endif
-
 
         #if 0      // timing test
 

@@ -1,8 +1,7 @@
-/*
- * crc15.h
- *
- *  Created on: 19 Oca 2024
- *      Author: mehmet.dincer
+/**
+ *  @brief crc15.h
+ *  @data Created on: 19 Oca 2024
+ *  @author: Mehmet Dinçer
  */
 
 #ifndef LTC681X_CRC_CRC15_H_
