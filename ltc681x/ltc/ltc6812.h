@@ -46,6 +46,23 @@
 #define GPIO_7                          (1 << 7)
 #define GPIO_8                          (1 << 8)
 
+//!< @refgroup cell
+#define CELL_1                          (1 << 0 )
+#define CELL_2                          (1 << 1 )
+#define CELL_3                          (1 << 2 )
+#define CELL_4                          (1 << 3 )
+#define CELL_5                          (1 << 4 )
+#define CELL_6                          (1 << 5 )
+#define CELL_7                          (1 << 6 )
+#define CELL_8                          (1 << 7 )
+#define CELL_9                          (1 << 8 )
+#define CELL_10                         (1 << 9 )
+#define CELL_11                         (1 << 10)
+#define CELL_12                         (1 << 11)
+#define CELL_13                         (1 << 12)
+#define CELL_14                         (1 << 13)
+#define CELL_15                         (1 << 14)
+
 //!< @refgroup dcc
 #define DCC_0                           (1 << 0)
 #define DCC_1                           (1 << 1)
@@ -128,16 +145,14 @@
 
 #define AE_LTC_CS_ON()                  (spiREG1->PC3 &= ~(1 << 0)) //drive low the cs0 pin
 #define AE_LTC_CS_OFF()                 (spiREG1->PC3 |= 1 << 0)    //drive hight the cs0 pins
-#define AE_LTC_GET_BIT(x,y)             ((x >> y) & 0x01)
-#define AE_LTC_SET_BIT(x,y, b)          (                       \
-                                            x &= ~(1 << y);     \
-                                            x |= (b << y);      \
-                                        )
+
 //<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<-ENUMS->>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 typedef enum{
     LTC_WRONG_CRC,
     LTC_OK,
     LTC_OPEN_WIRE,
+    LTC_IN_BALANCE,
+    LTC_BALANCE_COMPLETED
 }LTC_status;
 
 typedef enum{
@@ -502,9 +517,10 @@ uint8_t AE_ltcAdcMeasureState();
 
 void AE_ltcStartCellAdc(Ltc682x * ltcBat, AdcMode adcMode, uint8_t dischargePermit, uint8_t selectedCell);
 LTC_status AE_ltcReadCellVoltage(Ltc682x * ltcBat);
-LTC_status AE_ltcClearCellAdc();
+LTC_status AE_ltcClearCellAdc(Ltc682x * ltcBat);
 
 void AE_ltcSetUnderOverVoltage(Ltc682x * ltcBat, float underVolt, float overVolt);
+LTC_status AE_ltcUnderOverFlag(Ltc682x * ltcBat);
 
 void AE_ltcStartGpioAdc(Ltc682x * ltcBat, AdcMode adcMode, uint8_t GPIO_);
 LTC_status AE_ltcReadGPIOVoltage(Ltc682x * ltcBat);
@@ -520,6 +536,7 @@ void AE_ltcPausePwm(Ltc682x * ltcBat);
 void AE_ltcContinuePwm(Ltc682x * ltcBat);
 
 void AE_ltcSetBalance(Ltc682x * ltcBat, DischargeTime DIS_, float underVolt, float overVolt, uint16_t DCC_);
+LTC_status AE_ltcIsBalanceComplete(Ltc682x * ltcBat);
 float AE_ltcMinCellVolt(Ltc682x * ltcBat);
 
 LTC_status AE_ltcIsCellOpenWire(Ltc682x * ltcBat, AdcMode adcMode, uint8_t CELL_);

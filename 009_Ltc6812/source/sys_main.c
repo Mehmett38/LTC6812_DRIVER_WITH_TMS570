@@ -71,6 +71,7 @@ void ltcInit(spiBASE_t * spiReg);
 #define UNUSED(x)   ((void)x)
 uint8_t toggle = 1;
 uint8_t returnVarningClose;
+LTC_status status;
 double temperature;
 
 /* USER CODE END */
@@ -83,7 +84,7 @@ int main(void)
     gioInit();
 
 
-#if 0       // code testing V1.1    working successfully
+#if 0       // code testing V1.0    working successfully
     uint16_t isoTxData[12];
     uint16_t isoRxData[8] = {0};
     uint16_t eceTx;
@@ -113,24 +114,33 @@ int main(void)
     };
 #endif
 
-    LTC_status status;
 
+float min;
 
-    AE_delayMs(2);  // t-wakeup time
-
-#if 0               // read the lowest cell voltage and balance the other cell up to this level
-    AE_ltcStartCellAdc(&ltcBat, MODE_7KHZ, true, CELL_ALL);
+#if 1    // read the lowest cell voltage and balance the other cell up to this level
+    AE_ltcStartCellAdc(&ltcBat, MODE_7KHZ, false, CELL_ALL);
     //!< check adcMeasure duration is completed
     while(!AE_ltcAdcMeasureState());
     status = AE_ltcReadCellVoltage(&ltcBat);
-    status = AE_ltcClearCellAdc();
 
-    AE_ltcSetBalance(&ltcBat, DIS_5_MIN, AE_ltcMinCellVolt(&ltcBat), 4.2, DCC_ALL);
-    AE_ltcStartPwm(&ltcBat, S_PIN_ALL, PWM_DUTY_LEVEL_10);
+    min = AE_ltcMinCellVolt(&ltcBat) + 0.01;    //error ratio
+    AE_ltcSetBalance(&ltcBat, DIS_05_MIN, min, 4.2, DCC_ALL);
+    AE_ltcStartPwm(&ltcBat, S_PIN_ALL, PWM_DUTY_LEVEL_14);
 #endif
 
     while(1)
     {
+//<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<-LTC V2.0->>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+#if 0
+        AE_ltcSetUnderOverVoltage(&ltcBat, min, 4.2f);
+        status = AE_ltcIsBalanceComplete(&ltcBat);
+        if(status == LTC_BALANCE_COMPLETED)
+        {
+            int a = 10;
+            UNUSED(a);
+        }
+#endif
+
 #if 0   // open wire check !NOT TESTED
         status = AE_ltcIsCellOpenWire(&ltcBat, MODE_7KHZ, CELL_ALL);
         status = AE_ltcIsGpioOpenWire(&ltcBat, MODE_7KHZ, CELL_ALL);
@@ -140,65 +150,44 @@ int main(void)
         AE_ltcStartCellAdc(&ltcBat, MODE_7KHZ, true, CELL_ALL);
         //!< check adcMeasure duration is completed
         while(!AE_ltcAdcMeasureState());
-        AE_ltcReadCellVoltage(&ltcBat);
+        status = AE_ltcReadCellVoltage(&ltcBat);
 #endif
 
 #if 0   // GPIO voltage Measure
         AE_ltcStartGpioAdc(&ltcBat, MODE_7KHZ, GPIO_ALL);
         while(!AE_ltcAdcMeasureState());
-        AE_ltcReadGPIOVoltage(&ltcBat);
+        status = AE_ltcReadGPIOVoltage(&ltcBat);
 #endif
 
 #if 0   //read status registerA
         AE_ltcStartStatusAdc(&ltcBat, MODE_7KHZ, CHST_ALL);
         //!< check adcMeasure duration is completed
         while(!AE_ltcAdcMeasureState());
-        AE_ltcReadStatusRegA(&ltcBat);
+        status = AE_ltcReadStatusRegA(&ltcBat);
 #endif
 
 #if 0   //read status registerB
         AE_ltcStartStatusAdc(&ltcBat, MODE_7KHZ, CHST_ALL);
         //!< check adcMeasure duration is completed
         while(!AE_ltcAdcMeasureState());
-        AE_ltcReadStatusRegB(&ltcBat);
+        status = AE_ltcReadStatusRegB(&ltcBat);
 #endif
 
-#if 0   // read the status register
+#if 0   // read the status register A
         AE_ltcStartStatusAdc(&ltcBat, MODE_7KHZ, CHST_ALL);
         while(!AE_ltcAdcMeasureState());
-        AE_ltcReadStatusRegA(&ltcBat);
-        AE_ltcReadStatusRegB(&ltcBat);
+        status = AE_ltcReadStatusRegA(&ltcBat);
 #endif
-
-#if 0   // when under and over limits are exceeded for cellx, x.th flag is raise
-
-        AE_ltcStartStatusAdc(&ltcBat, MODE_7KHZ, CHST_ALL);
-        while(!AE_ltcAdcMeasureState());
-        AE_ltcReadStatusRegA(&ltcBat);
-        AE_ltcReadStatusRegB(&ltcBat);
-
-        if(ltcBat.statusRegB.CellUnderFlag.cell1)
-        {
-            // cell1 undervoltage flag is raise enter this block
-        }
-#endif
-
 
 #if 0   //internal die temperature
         AE_ltcStartStatusAdc(&ltcBat, MODE_7KHZ, CHST_ALL);
         while(!AE_ltcAdcMeasureState());
         AE_ltcReadStatusRegA(&ltcBat);
-        AE_ltcReadStatusRegB(&ltcBat);
 
         if(ltcBat.statusRegA.internalDieTemp > 150)    //configuration register is reset
         {
             /*the thermal shutdown circuit trips and resets the Configuration
              * Register Groups (except the MUTE bit) and turns off all discharge switches.*/
-        }
-
-        if(ltcBat.statusRegB.thsd)  // system die temperature pass the 150degree and reset the configuration register
-        {
-
         }
 #endif
 
@@ -207,12 +196,12 @@ int main(void)
         AE_ltcStartPwm(&ltcBat, S_PIN_4 | S_PIN_5| S_PIN_6, PWM_DUTY_LEVEL_8);
 #endif
 
-#if 0
+#if 0   //pwm stop and continue commands
         AE_ltcPausePwm(&ltcBat);        // pause the pwm
         AE_ltcContinuePwm(&ltcBat);     // continue if pwm is paused
 #endif
 
-#if 0    // close the adc, LTC6812-1 has 3 clear ADC commands: CLRCELL, CLRAUX and CLRSTAT
+#if 0   // close the adc, LTC6812-1 has 3 clear ADC commands: CLRCELL, CLRAUX and CLRSTAT
         status = AE_ltcClearCellAdc(&ltcBat);
         status = AE_ltcClearGpioAdc(&ltcBat);
         status = AE_ltcClearStatusAdc(&ltcBat);
@@ -222,33 +211,32 @@ int main(void)
         temperature = AE_ltcTemperature(&ltcBat);
 #endif
 
-#if 0   // !!!Not working cell limit control
-        AE_ltcStartCellAdc(&ltcBat, MODE_7KHZ, true, CELL_ALL);
-        //!< check adcMeasure duration is completed
-        while(!AE_ltcAdcMeasureState());
-        status = AE_ltcReadCellVoltage(&ltcBat);
+#if 0   // when under and over limits are exceeded for cellx, x.th flag is raise
+        AE_ltcSetUnderOverVoltage(&ltcBat, 3.7f, 4.2f);
 
-        AE_ltcSetUnderOverVoltage(&ltcBat, 3.0f, 4.2f);
+        status = AE_ltcUnderOverFlag(&ltcBat);
 
-        AE_ltcStartStatusAdc(&ltcBat, MODE_7KHZ, CHST_ALL);
-        while(!AE_ltcAdcMeasureState());
-        AE_ltcReadStatusRegA(&ltcBat);
-        AE_ltcReadStatusRegB(&ltcBat);
-
-        uint8_t statusCell1 = ltcBat.statusRegB.CellOverFlag.cell1;
-        if(statusCell1)
+        if(ltcBat.statusRegB.CellOverFlag.cell1)
         {
-            //cell1 exceed the overvoltage limit
+            //cell 1 is overVoltage
+        }
+        else
+        {
+            //cell 1 is less than limit
         }
 
-        statusCell1 = ltcBat.statusRegB.CellUnderFlag.cell1;
-        if(statusCell1)
+        if(ltcBat.statusRegB.CellUnderFlag.cell1)
         {
-            //cell1 below the undervoltage limit
+            //cell 1 in undervoltage
         }
-
+        else
+        {
+            //cell 1 in over than sub limit
+        }
 #endif
-        //<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<BEFORE WORKING LTC>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+
+        //<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<BEFORE WORKING LTC V1.0>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
         #if 0   // code testing V1.1    working successfully
 
@@ -343,6 +331,8 @@ void ltcInit(spiBASE_t * spiReg)
                                                                 //Group B to 1 to enable this feature.
 
     AE_ltcInit(spiReg, &ltcBat);
+
+    AE_delayMs(2);  // t-wakeup time
 }
 
 

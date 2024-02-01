@@ -8,14 +8,15 @@
 #include "ltc6812.h"
 
 //<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<-GLOBAL VARIABLES->>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-uint16_t txBuffer[256];
-uint16_t rxBuffer[256];
+static uint16_t txBuffer[256];
+static uint16_t rxBuffer[256];
 volatile uint32_t uwTick;
 static spiBASE_t * ltcSpi_ps;                                           // spi base address
-uint8_t slaveNumber;                                                    // bms total connection
+static uint8_t slaveNumber;                                                    // bms total connection
 static uint16_t i;                                                      // counter
-uint16_t dummy_u16 = 0xFF;                                              // dummy variable
-spiDAT1_t spiDat_s =                                                    // spi configuration parameters
+static uint16_t dummy_u16 = 0xFF;                                              // dummy variable
+static LTC_status balanceStatus = LTC_BALANCE_COMPLETED;
+static spiDAT1_t spiDat_s =                                                    // spi configuration parameters
 {
      .CSNR = 0,
      .CS_HOLD = 1,
@@ -289,6 +290,9 @@ void AE_ltcSetUnderOverVoltage(Ltc682x * ltcBat, float underVolt, float overVolt
     ltcBat->cfgAr.CFGAR3.cfg = 0;
 
     // configure the voltage
+    ltcBat->cfgAr.CFGAR0.DTEN = 1;
+    ltcBat->cfgAr.CFGAR0.REFON = 1;
+
     ltcBat->cfgAr.CFGAR1.cfg |= underVoltTemp & 0x00FF;
     ltcBat->cfgAr.CFGAR2.cfg |= (underVoltTemp >> 8) & 0x000F;
 
@@ -296,6 +300,47 @@ void AE_ltcSetUnderOverVoltage(Ltc682x * ltcBat, float underVolt, float overVolt
     ltcBat->cfgAr.CFGAR3.cfg |= (overVoltTemp >> 4) & 0x00FF;
 
     AE_ltcWrite((uint16_t*)&ltcBat->cfgAr, cmdWRCFGA_pu16);
+}
+
+LTC_status AE_ltcUnderOverFlag(Ltc682x * ltcBat)
+{
+    LTC_status status;
+
+    // Although all other functions work in a single call, Status register group B does not work
+    // To work this command cell read 3 times, I find this by trying
+    for(i = 0; i < 3; i++)
+    {
+        AE_ltcStartCellAdc(ltcBat, MODE_7KHZ, true, CELL_ALL);
+        //!< check adcMeasure duration is completed
+        while(!AE_ltcAdcMeasureState());
+        status = AE_ltcReadCellVoltage(ltcBat);
+
+        if(status == LTC_WRONG_CRC) return LTC_WRONG_CRC;
+    }
+
+    //read status register B, flags 1-12 located here
+    AE_ltcStartStatusAdc(ltcBat, MODE_7KHZ, CHST_ALL);
+    while(!AE_ltcAdcMeasureState());
+    status = AE_ltcReadStatusRegB(ltcBat);
+
+    if(status == LTC_WRONG_CRC) return LTC_WRONG_CRC;
+
+    //read auxilary register D , flags 13-15 located here
+    AE_ltcStartGpioAdc(ltcBat, MODE_7KHZ, GPIO_ALL);
+    while(!AE_ltcAdcMeasureState());
+    status = AE_ltcRead(rxBuffer, cmdRDAUXD_pu16);
+    if(status == LTC_WRONG_CRC) return LTC_WRONG_CRC;
+
+    //assign flags that come from auxilary groupd flags to status register B structure
+    ltcBat->statusRegB.CellUnderFlag.cell13 = (rxBuffer[4] >> 0) & 0x01;
+    ltcBat->statusRegB.CellUnderFlag.cell14 = (rxBuffer[4] >> 2) & 0x01;
+    ltcBat->statusRegB.CellUnderFlag.cell15 = (rxBuffer[4] >> 4) & 0x01;
+
+    ltcBat->statusRegB.CellOverFlag.cell13 = (rxBuffer[4] >> 1) & 0x01;
+    ltcBat->statusRegB.CellOverFlag.cell14 = (rxBuffer[4] >> 3) & 0x01;
+    ltcBat->statusRegB.CellOverFlag.cell15 = (rxBuffer[4] >> 5) & 0x01;
+
+    return LTC_OK;
 }
 
 /**
@@ -348,7 +393,7 @@ uint8_t AE_ltcAdcMeasureState()
  * @brief Start the adc conversion for the GPIO pins
  * @param[in] bms global variable
  * @param[in] adc speed selection
- * @param[in] gio pin that want to read, to parameter search @refgroup CHG
+ * @param[in] gio pin that want to read, to parameter search
  * @return none
  */
 void AE_ltcStartGpioAdc(Ltc682x * ltcBat, AdcMode adcMode, uint8_t GPIO_)
@@ -498,6 +543,8 @@ LTC_status AE_ltcReadStatusRegB(Ltc682x * ltcBat)
 {
     LTC_status status;
 
+    memset((void*)&ltcBat->statusRegB.digitalPowerSupplyVolt, 0, sizeof(StatusRegB));
+
     status = AE_ltcRead(rxBuffer, cmdRDSTATB_pu16);
     if(status == LTC_WRONG_CRC) return status;
 
@@ -530,7 +577,7 @@ LTC_status AE_ltcReadStatusRegB(Ltc682x * ltcBat)
  * @param[in] bms global variable
  * @return if packet is true ok else crc error
  */
-LTC_status AE_ltcClearCellAdc()
+LTC_status AE_ltcClearCellAdc(Ltc682x * ltcBat)
 {
     Ltc682x ltcTemp;
     LTC_status status;
@@ -540,8 +587,12 @@ LTC_status AE_ltcClearCellAdc()
     status = AE_ltcReadCellVoltage(&ltcTemp);
     if(status == LTC_WRONG_CRC) return status;
 
-    if(ltcTemp.volt.cell1 > 6.5)        //!< if adc conversion is close read the pin 0xFF but this variable is
-        return LTC_OK;                  // float, so value > 6.5 condition is consistent
+    if(ltcTemp.volt.cell1 > 6.5)                                    //!< if adc conversion is close read the pin 0xFF but this variable is
+    {
+        memset((void*)&ltcBat->volt.cell1, 0, sizeof(CellVolt));    // float, so value > 6.5 condition is consistent
+
+        return LTC_OK;
+    }
     else
         return LTC_WRONG_CRC;
 }
@@ -561,7 +612,10 @@ LTC_status AE_ltcClearGpioAdc(Ltc682x * ltcBat)
     if(status == LTC_WRONG_CRC) return status;
 
     if(ltcBat->gpio.gpio1 > 6.5)        //!< //!< if adc conversion is close read the pin 0xFF but this variable is
-        return LTC_OK;                  // float, so value > 6.5 condition is consistent
+    {                                   // float, so value > 6.5 condition is consistent
+        memset((void*)&ltcBat->gpio.gpio1, 0, sizeof(Gpio));
+        return LTC_OK;
+    }
     else
         return LTC_WRONG_CRC;
 }
@@ -581,7 +635,10 @@ LTC_status AE_ltcClearStatusAdc(Ltc682x * ltcBat)
     if(status == LTC_WRONG_CRC) return status;
 
     if(ltcBat->gpio.gpio1 > 6.5)        //!< //!< if adc conversion is close read the pin 0xFF but this variable is
-        return LTC_OK;                  // float, so value > 6.5 condition is consistent
+    {                                   // float, so value > 6.5 condition is consistent
+        memset((void*)&ltcBat->statusRegA.sumOfCell, 0, sizeof(StatusRegA));
+        return LTC_OK;
+    }
     else
         return LTC_WRONG_CRC;
 }
@@ -683,6 +740,41 @@ void AE_ltcSetBalance(Ltc682x * ltcBat, DischargeTime DIS_, float underVolt, flo
 
     AE_ltcWrite((uint16_t*)&ltcBat->cfgAr, cmdWRCFGA_pu16);
     AE_ltcWrite((uint16_t*)&ltcBat->cfgBr, cmdWRCFGB_pu16);
+
+    balanceStatus = LTC_IN_BALANCE;
+}
+
+LTC_status AE_ltcIsBalanceComplete(Ltc682x * ltcBat)
+{
+    LTC_status status;
+    uint16_t dccVal = 0;
+
+    if(balanceStatus == LTC_IN_BALANCE)
+    {
+        status = AE_ltcRead((uint16_t*)&ltcBat->cfgAr.CFGAR0.cfg, cmdRDCFGA_pu16);
+        status = AE_ltcRead((uint16_t*)&ltcBat->cfgBr.CFGBR0.cfg, cmdRDCFGB_pu16);
+
+        if(status == LTC_WRONG_CRC) return LTC_WRONG_CRC;
+
+        dccVal |= (ltcBat->cfgAr.CFGAR4.cfg & 0xFF) << 1;   // 1 - 0 (1 = DCCx's x, 0 = register start index)
+        dccVal |= (ltcBat->cfgAr.CFGAR5.cfg & 0x0F) << 9;   // 9 - 0
+        dccVal |= (ltcBat->cfgBr.CFGBR0.cfg & 0x70) << 9;   // 13 - 4 (look at datasheet 4 comes register start index)
+        dccVal |= (ltcBat->cfgBr.CFGBR1.cfg & 0x04) >> 2;   // 0 - 2
+
+        //when balance is completed dccVal will be 0 and
+        if(!dccVal)
+        {
+            return LTC_BALANCE_COMPLETED;
+        }
+        else
+        {
+            return LTC_IN_BALANCE;
+        }
+    }
+    else
+    {
+        return LTC_BALANCE_COMPLETED;
+    }
 }
 
 /**
@@ -744,7 +836,7 @@ LTC_status AE_ltcIsCellOpenWire(Ltc682x * ltcBat, AdcMode adcMode, uint8_t CELL_
     cmd[2] = (pec & 0xFF00) >> 8;
     cmd[3] = (pec & 0x00FF) >> 0;
 
-    AE_ltcClearCellAdc();
+    AE_ltcClearCellAdc(ltcBat);
 
     AE_ltcCmdRead(cmd);
     AE_ltcCmdRead(cmd);
@@ -763,7 +855,7 @@ LTC_status AE_ltcIsCellOpenWire(Ltc682x * ltcBat, AdcMode adcMode, uint8_t CELL_
     cmd[2] = (pec & 0xFF00) >> 8;
     cmd[3] = (pec & 0x00FF) >> 0;
 
-    AE_ltcClearCellAdc();
+    AE_ltcClearCellAdc(ltcBat);
 
     AE_ltcCmdRead(cmd);
     AE_ltcCmdRead(cmd);
