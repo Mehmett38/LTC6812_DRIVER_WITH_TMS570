@@ -115,7 +115,7 @@ int main(void)
 #endif
 
 
-float min;
+float minVolt;
 
 #if 1    // read the lowest cell voltage and balance the other cell up to this level
     AE_ltcStartCellAdc(&ltcBat, MODE_7KHZ, false, CELL_ALL);
@@ -123,8 +123,8 @@ float min;
     while(!AE_ltcAdcMeasureState());
     status = AE_ltcReadCellVoltage(&ltcBat);
 
-    min = AE_ltcMinCellVolt(&ltcBat) + 0.01;    //error ratio
-    AE_ltcSetBalance(&ltcBat, DIS_05_MIN, min, 4.2, DCC_ALL);
+    minVolt = AE_ltcMinCellVolt(&ltcBat);    //error ratio
+    AE_ltcPreBalance(&ltcBat, DIS_5_MIN, minVolt, 4.2, DCC_ALL);
     AE_ltcStartPwm(&ltcBat, S_PIN_ALL, PWM_DUTY_LEVEL_14);
 #endif
 
@@ -325,10 +325,6 @@ void ltcInit(spiBASE_t * spiReg)
     ltcBat.batConf.numberOfSerialCell = 15;                     // cell number in a slave
     ltcBat.batConf.numberOfSlave = 1;                           // number of slave
 
-    ltcBat.batConf.dischargeTimeMonitor = true;                 //The LTC6812-1 has the ability to periodically monitor
-                                                                //cell voltages while the discharge timer is active. The host
-                                                                //should write the DTMEN bit in Configuration Register
-                                                                //Group B to 1 to enable this feature.
 
     AE_ltcInit(spiReg, &ltcBat);
 

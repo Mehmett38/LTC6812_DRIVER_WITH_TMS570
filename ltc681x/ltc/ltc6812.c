@@ -58,8 +58,6 @@ void AE_ltcInit(spiBASE_t * spi, Ltc682x * ltcBat)
     ltcBat->cfgBr.CFGBR0.cfg |= ltcBat->batConf.gioBPullOffPin >> 6;    // GPIO6 located 6th index and Register start location
                                                                         // at 0th index so we must shift 6 bit right
 
-    ltcBat->cfgBr.CFGBR1.DTMEN |= ltcBat->batConf.dischargeTimeMonitor;
-
     AE_ltcWrite((uint16_t*)&ltcBat->cfgAr, cmdWRCFGA_pu16);             // write to configuration register
     AE_ltcWrite((uint16_t*)&ltcBat->cfgBr, cmdWRCFGB_pu16);             // write to configuration register
 }
@@ -701,9 +699,14 @@ void AE_ltcContinuePwm(Ltc682x * ltcBat)
  * @param[in] pin that want to balance, for parameter search @refgroup dcc
  * @return none
  */
-void AE_ltcSetBalance(Ltc682x * ltcBat, DischargeTime DIS_, float underVolt, float overVolt, uint16_t DCC_)
+void AE_ltcPreBalance(Ltc682x * ltcBat, DischargeTime DIS_, float underVolt, float overVolt, uint16_t DCC_)
 {
     uint16_t maskedDCC;
+
+    ltcBat->cfgBr.CFGBR1.DTMEN |= 1;            //The LTC6812-1 has the ability to periodically monitor
+                                                //cell voltages while the discharge timer is active. The host
+                                                //should write the DTMEN bit in Configuration Register
+                                                //Group B to 1 to enable this feature.
 
     // clear related bits
     ltcBat->cfgAr.CFGAR4.cfg &= 0x00;

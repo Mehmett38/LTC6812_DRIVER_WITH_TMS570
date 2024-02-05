@@ -535,7 +535,7 @@ void AE_ltcStartPwm(Ltc682x * ltcBat, uint16_t S_PIN_, uint8_t PWM_DUTY_LEVEL_);
 void AE_ltcPausePwm(Ltc682x * ltcBat);
 void AE_ltcContinuePwm(Ltc682x * ltcBat);
 
-void AE_ltcSetBalance(Ltc682x * ltcBat, DischargeTime DIS_, float underVolt, float overVolt, uint16_t DCC_);
+void AE_ltcPreBalance(Ltc682x * ltcBat, DischargeTime DIS_, float underVolt, float overVolt, uint16_t DCC_);
 LTC_status AE_ltcIsBalanceComplete(Ltc682x * ltcBat);
 float AE_ltcMinCellVolt(Ltc682x * ltcBat);
 
