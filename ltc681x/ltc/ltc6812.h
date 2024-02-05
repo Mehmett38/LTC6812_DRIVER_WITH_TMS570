@@ -513,6 +513,12 @@ uint16_t AE_ltcCmdRead(uint16_t cmd[4]);
 void AE_ltcWakeUpSleep();
 void AE_ltcWakeUpIdle();
 
+void AE_ltcWriteConfRegA(Ltc682x * ltcBat);
+void AE_ltcWriteConfRegB(Ltc682x * ltcBat);
+
+LTC_status AE_ltcReadConfRegA(Ltc682x * ltcBat);
+LTC_status AE_ltcReadConfRegB(Ltc682x * ltcBat);
+
 uint8_t AE_ltcAdcMeasureState();
 
 void AE_ltcStartCellAdc(Ltc682x * ltcBat, AdcMode adcMode, uint8_t dischargePermit, uint8_t selectedCell);
@@ -536,6 +542,7 @@ void AE_ltcPausePwm(Ltc682x * ltcBat);
 void AE_ltcContinuePwm(Ltc682x * ltcBat);
 
 void AE_ltcPreBalance(Ltc682x * ltcBat, DischargeTime DIS_, float underVolt, float overVolt, uint16_t DCC_);
+void AE_ltcBalance(Ltc682x * ltcBat, float minVoltage);
 LTC_status AE_ltcIsBalanceComplete(Ltc682x * ltcBat);
 float AE_ltcMinCellVolt(Ltc682x * ltcBat);
 

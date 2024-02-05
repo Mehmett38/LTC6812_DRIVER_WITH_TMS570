@@ -175,7 +175,7 @@ BIN_OUTPUTS__QUOTED += \
 
 # All Target
 all: $(OBJS) $(CMD_SRCS) $(GEN_CMDS)
-	@$(MAKE) --no-print-directory -Onone "009_Ltc6812.out"
+	@$(MAKE) --no-print-directory -Onone "009_Ltc6812.out" secondary-outputs
 
 # Tool invocations
 009_Ltc6812.out: $(OBJS) $(CMD_SRCS) $(GEN_CMDS)
@@ -191,6 +191,7 @@ all: $(OBJS) $(CMD_SRCS) $(GEN_CMDS)
 	"C:/ti/ccs1120/ccs/tools/compiler/ti-cgt-arm_20.2.5.LTS/bin/armhex" --diag_wrap=off -o "009_Ltc6812.hex" $(EXE_OUTPUTS__QUOTED)
 	@echo 'Finished building secondary target: "$@"'
 	@echo ' '
+	@$(MAKE) --no-print-directory post-build
 
 # Other Targets
 clean:
@@ -201,6 +202,12 @@ clean:
 	-$(RM) "009_Ltc6812\source\dabort.d" "009_Ltc6812\source\os_portasm.d" "009_Ltc6812\source\sys_core.d" "009_Ltc6812\source\sys_intvecs.d" "009_Ltc6812\source\sys_mpu.d" "009_Ltc6812\source\sys_pmu.d" 
 	-@echo 'Finished clean'
 	-@echo ' '
+
+post-build:
+	-"C:/ti/ccs1120/ccs/utils/tiobj2bin/tiobj2bin" "009_Ltc6812.out" "009_Ltc6812.bin" "C:/ti/ccs1120/ccs/tools/compiler/ti-cgt-arm_20.2.5.LTS/bin/armofd" "C:/ti/ccs1120/ccs/tools/compiler/ti-cgt-arm_20.2.5.LTS/bin/armhex" "C:/ti/ccs1120/ccs/utils/tiobj2bin/mkhex4bin"
+	-@echo ' '
+
+secondary-outputs: $(BIN_OUTPUTS)
 
 .PHONY: all clean dependents
 .SECONDARY:

@@ -117,7 +117,7 @@ int main(void)
 
 float minVolt;
 
-#if 1    // read the lowest cell voltage and balance the other cell up to this level
+#if 0    // read the lowest cell voltage and balance the other cell up to this level
     AE_ltcStartCellAdc(&ltcBat, MODE_7KHZ, false, CELL_ALL);
     //!< check adcMeasure duration is completed
     while(!AE_ltcAdcMeasureState());
@@ -128,8 +128,22 @@ float minVolt;
     AE_ltcStartPwm(&ltcBat, S_PIN_ALL, PWM_DUTY_LEVEL_14);
 #endif
 
+#if 1   // balance in polling mode
+    AE_ltcStartCellAdc(&ltcBat, MODE_7KHZ, false, CELL_ALL);
+    //!< check adcMeasure duration is completed
+    while(!AE_ltcAdcMeasureState());
+    status = AE_ltcReadCellVoltage(&ltcBat);
+
+    minVolt = AE_ltcMinCellVolt(&ltcBat);    //error ratio
+#endif
+
+
     while(1)
     {
+
+#if 1   //balance in polling
+        AE_ltcBalance(&ltcBat, minVolt);
+#endif
 //<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<-LTC V2.0->>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 #if 0
         AE_ltcSetUnderOverVoltage(&ltcBat, min, 4.2f);
@@ -299,7 +313,7 @@ float minVolt;
 
         #endif
 
-        AE_delayMs(100);
+        AE_delayMs(4500);
 
         if(status == LTC_OK);                   //!< close the status warning
         if(returnVarningClose == 10)    break;  //!< close return 0 warning
@@ -324,7 +338,6 @@ void ltcInit(spiBASE_t * spiReg)
 
     ltcBat.batConf.numberOfSerialCell = 15;                     // cell number in a slave
     ltcBat.batConf.numberOfSlave = 1;                           // number of slave
-
 
     AE_ltcInit(spiReg, &ltcBat);
 

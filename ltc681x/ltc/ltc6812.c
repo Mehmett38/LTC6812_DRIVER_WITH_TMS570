@@ -212,6 +212,47 @@ void AE_ltcWakeUpIdle()
     AE_delayTenUs(1);                                           //!< 10us delay, t-ready time
 }
 
+
+/**
+ * @brief write to configuration register A
+ * @param[in] bms global valiable
+ * @return none
+ */
+void AE_ltcWriteConfRegA(Ltc682x * ltcBat)
+{
+    AE_ltcWrite((uint16_t*)&ltcBat->cfgAr, cmdWRCFGA_pu16);             // write to configuration register
+}
+
+/**
+ * @brief write to configuration register B
+ * @param[in] bms global variable
+ * @return none
+ */
+void AE_ltcWriteConfRegB(Ltc682x * ltcBat)
+{
+    AE_ltcWrite((uint16_t*)&ltcBat->cfgBr, cmdWRCFGB_pu16);             // write to configuration register
+}
+
+/**
+ * @brief read the configuration register A
+ * @param[in] bms global variable
+ * @return none
+ */
+LTC_status AE_ltcReadConfRegA(Ltc682x * ltcBat)
+{
+    return AE_ltcRead((uint16_t*)&ltcBat->cfgAr.CFGAR0.cfg, cmdRDCFGA_pu16);
+}
+
+/**
+ * @brief read the configuration register B
+ * @param[in] bms global variable
+ * @return none
+ */
+LTC_status AE_ltcReadConfRegB(Ltc682x * ltcBat)
+{
+    return AE_ltcRead((uint16_t*)&ltcBat->cfgBr.CFGBR0.cfg, cmdRDCFGB_pu16);
+}
+
 /**
  * @brief Read the cell voltage
  * @param[in] ltcBat global variable
@@ -308,7 +349,7 @@ LTC_status AE_ltcUnderOverFlag(Ltc682x * ltcBat)
     // To work this command cell read 3 times, I find this by trying
     for(i = 0; i < 3; i++)
     {
-        AE_ltcStartCellAdc(ltcBat, MODE_7KHZ, true, CELL_ALL);
+        AE_ltcStartCellAdc(ltcBat, MODE_422HZ, true, CELL_ALL);
         //!< check adcMeasure duration is completed
         while(!AE_ltcAdcMeasureState());
         status = AE_ltcReadCellVoltage(ltcBat);
@@ -747,6 +788,59 @@ void AE_ltcPreBalance(Ltc682x * ltcBat, DischargeTime DIS_, float underVolt, flo
     balanceStatus = LTC_IN_BALANCE;
 }
 
+/**
+ * @brief balance the cell in polling mode by checking the under and overvoltage flags
+ * @param[in] bms global variable
+ * @param[in] slave's min cell voltage
+ * @return none
+ */
+void AE_ltcBalance(Ltc682x * ltcBat, float minVoltage)
+{
+    uint16_t maskedDCC;
+
+//    minVoltage += 0.003f;       //!< optimization
+
+    //clear the configuration register-A
+    memset((void*)&ltcBat->cfgAr.CFGAR0.cfg, 0, sizeof(CFGAR));
+
+    //enable REFON bit
+    ltcBat->cfgAr.CFGAR0.REFON |= 1;
+
+    //clear the DCC13-15, DCC0 and discharge timer enable
+    ltcBat->cfgBr.CFGBR0.cfg &= 0x8F;
+    ltcBat->cfgBr.CFGBR1.DTMEN = 0;
+    ltcBat->cfgBr.CFGBR1.DCC0 = 0;
+
+    AE_ltcWrite((uint16_t*)&ltcBat->cfgAr, cmdWRCFGA_pu16);
+    AE_ltcWrite((uint16_t*)&ltcBat->cfgBr, cmdWRCFGB_pu16);
+
+    // set the under and overvoltage limit
+    AE_ltcSetUnderOverVoltage(ltcBat, 3.0f, minVoltage);
+
+    // take the under and overvoltage flags
+    AE_ltcUnderOverFlag(ltcBat);
+
+    maskedDCC = ltcBat->statusRegB.CellOverFlag.flag;
+
+    //<<<<<<<<<<<<<<<-Over Voltage->>>>>>>>>>>>>>>
+    //DCC pins are scattered in several registers so we must mask them
+    ltcBat->cfgAr.CFGAR4.cfg |= maskedDCC & 0xFF;
+
+    //Register Group A, CFGRA5 Mask = pin9-12    0x1E00
+    ltcBat->cfgAr.CFGAR5.cfg |= (maskedDCC >> 8) & 0x0F;
+
+    //Register Group B, CFGBR0 Mask = pin13-15    0xE000
+    ltcBat->cfgBr.CFGBR0.cfg |= (maskedDCC >> 8) & 0xF0;
+
+    ltcBat->cfgAr.CFGAR5.DCTO = 1;
+
+    AE_ltcWrite((uint16_t*)&ltcBat->cfgAr, cmdWRCFGA_pu16);
+    AE_ltcWrite((uint16_t*)&ltcBat->cfgBr, cmdWRCFGB_pu16);
+}
+
+/**
+ * @brief check the balance status
+ */
 LTC_status AE_ltcIsBalanceComplete(Ltc682x * ltcBat)
 {
     LTC_status status;
