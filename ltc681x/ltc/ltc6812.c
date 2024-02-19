@@ -614,31 +614,40 @@ LTC_status AE_ltcReadStatusRegB(Ltc682x * ltcBat)
 {
     LTC_status status;
 
-    memset((void*)&ltcBat->statusRegB.digitalPowerSupplyVolt, 0, sizeof(StatusRegB));
+    uint16_t * fRxPtr = NULL;                  // to access the rx buffer's 8k index
 
     status = AE_ltcRead(rxBuffer, cmdRDSTATB_pu16);
     if(status == LTC_WRONG_CRC) return status;
 
-    ltcBat->statusRegB.digitalPowerSupplyVolt = (rxBuffer[0] << 8 | rxBuffer[1])/10000.0;
-
-    //!< if you think this function looks like too complex, yes you are right
-    //!< if this function did not written like this, 24 line code is needed
-    //!< rxBuffer[i/4 + 2] => (+2) is offset related to Status Register Group B
-    //!< 0x02 << ((i % 4) * 2)) select the bit 1,3,5,7
-    //!< 0x01 << ((i % 4) * 2)) select the bit 0,2,4,6
-    //!< if that ↑ index is ( >0 ) assign this bit to (1 << i)
-    for(i = 0; i < 12; i++)
+    for(i = 0; i < slaveNumber; i++)
     {
-        ltcBat->statusRegB.CellOverFlag.flag |=
-                ((rxBuffer[i / 4 + 2] & (0x02 << ((i % 4) * 2))) != 0) ? (1<<i) : 0;
-        ltcBat->statusRegB.CellUnderFlag.flag |=
-                ((rxBuffer[i / 4 + 2] & (0x01 << ((i % 4) * 2))) != 0) ? (1<<i) : 0;
+        fRxPtr = (uint16_t*)&rxBuffer[i * RECEIVE_LEN];
+
+        memset((void*)&ltcBat[i].statusRegB.digitalPowerSupplyVolt, 0, sizeof(StatusRegB));
+
+
+        ltcBat[i].statusRegB.digitalPowerSupplyVolt = (fRxPtr[0] << 8 | fRxPtr[1])/10000.0;
+
+        //!< if you think this function looks like too complex, yes you are right
+        //!< if this function did not written like this, 24 line code is needed
+        //!< rxBuffer[i/4 + 2] => (+2) is offset related to Status Register Group B
+        //!< 0x02 << ((i % 4) * 2)) select the bit 1,3,5,7
+        //!< 0x01 << ((i % 4) * 2)) select the bit 0,2,4,6
+        //!< if that ↑ index is ( >0 ) assign this bit to (1 << i)
+        //!< 12 is flag number in status register B
+        for(i = 0; i < 12; i++)
+        {
+            ltcBat[i].statusRegB.CellOverFlag.flag |=
+                    ((fRxPtr[i / 4 + 2] & (0x02 << ((i % 4) * 2))) != 0) ? (1<<i) : 0;
+            ltcBat[i].statusRegB.CellUnderFlag.flag |=
+                    ((fRxPtr[i / 4 + 2] & (0x01 << ((i % 4) * 2))) != 0) ? (1<<i) : 0;
+        }
+
+        ltcBat[i].statusRegB.thsd = fRxPtr[5] & 0x01;
+        ltcBat[i].statusRegB.muxFail = (fRxPtr[5] >> 1) & 0x01;
+
+        ltcBat[i].statusRegB.revionCode = (fRxPtr[5] >> 5) & 0x0F;
     }
-
-    ltcBat->statusRegB.thsd = rxBuffer[5] & 0x01;
-    ltcBat->statusRegB.muxFail = (rxBuffer[5] >> 1) & 0x01;
-
-    ltcBat->statusRegB.revionCode = (rxBuffer[5] >> 5) & 0x0F;
 
     return status;
 }

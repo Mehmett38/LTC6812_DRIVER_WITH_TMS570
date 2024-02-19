@@ -161,7 +161,7 @@ float minVolt;
         status = AE_ltcIsGpioOpenWire(&ltcBat, MODE_7KHZ, CELL_ALL);
 #endif
 
-#if 1   // read the cell voltage
+#if 0   // read the cell voltage
         AE_ltcStartCellAdc(ltcBat, MODE_7KHZ, true, CELL_ALL);
         //!< check adcMeasure duration is completed
         while(!AE_ltcAdcMeasureState());
@@ -181,11 +181,11 @@ float minVolt;
         status = AE_ltcReadStatusRegA(ltcBat);
 #endif
 
-#if 0   //read status registerB
-        AE_ltcStartStatusAdc(&ltcBat, MODE_7KHZ, CHST_ALL);
+#if 1   //read status registerB
+        AE_ltcStartStatusAdc(ltcBat, MODE_7KHZ, CHST_ALL);
         //!< check adcMeasure duration is completed
         while(!AE_ltcAdcMeasureState());
-        status = AE_ltcReadStatusRegB(&ltcBat);
+        status = AE_ltcReadStatusRegB(ltcBat);
 #endif
 
 #if 0   // read the status register A
