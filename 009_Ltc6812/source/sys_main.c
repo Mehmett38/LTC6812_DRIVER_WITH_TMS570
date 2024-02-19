@@ -79,7 +79,7 @@ double temperature;
 int main(void)
 {
 /* USER CODE BEGIN (3) */
-    ltcInit(spiREG1);
+    ltcInit(spiREG3);
 
     gioInit();
 
@@ -128,7 +128,7 @@ float minVolt;
     AE_ltcStartPwm(&ltcBat, S_PIN_ALL, PWM_DUTY_LEVEL_14);
 #endif
 
-#if 1   // balance in polling mode
+#if 0   // balance in polling mode
     AE_ltcStartCellAdc(&ltcBat, MODE_7KHZ, false, CELL_ALL);
     //!< check adcMeasure duration is completed
     while(!AE_ltcAdcMeasureState());
@@ -141,7 +141,7 @@ float minVolt;
     while(1)
     {
 
-#if 1   //balance in polling
+#if 0   //balance in polling
         AE_ltcBalance(&ltcBat, minVolt);
 #endif
 //<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<-LTC V2.0->>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
@@ -160,7 +160,7 @@ float minVolt;
         status = AE_ltcIsGpioOpenWire(&ltcBat, MODE_7KHZ, CELL_ALL);
 #endif
 
-#if 0   // read the cell voltage
+#if 1   // read the cell voltage
         AE_ltcStartCellAdc(&ltcBat, MODE_7KHZ, true, CELL_ALL);
         //!< check adcMeasure duration is completed
         while(!AE_ltcAdcMeasureState());
@@ -336,7 +336,7 @@ void ltcInit(spiBASE_t * spiReg)
     ltcBat.batConf.gioAPullOffPin = GPIO_5 | GPIO_4 | GPIO_3;   // selected pin's pull down off
     ltcBat.batConf.gioBPullOffPin = GPIO_8 | GPIO_7 | GPIO_6;   // selected pin's pull down off
 
-    ltcBat.batConf.numberOfSerialCell = 15;                     // cell number in a slave
+    ltcBat.batConf.numberOfSerialCell = 13;                     // cell number in a slave
     ltcBat.batConf.numberOfSlave = 1;                           // number of slave
 
     AE_ltcInit(spiReg, &ltcBat);

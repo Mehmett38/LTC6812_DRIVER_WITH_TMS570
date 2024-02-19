@@ -135,8 +135,8 @@ LTC_status AE_ltcRead(uint16_t * rxData, uint16_t cmd[4])
 
     AE_LTC_CS_ON();
 
-    spiTransmitData(spiREG1, &spiDat_s, 4, cmd);
-    spiReceiveData(spiREG1, &spiDat_s, (slaveNumber * RECEIVE_LEN), rxBuffer);
+    spiTransmitData(ltcSpi_ps, &spiDat_s, 4, cmd);
+    spiReceiveData(ltcSpi_ps, &spiDat_s, (slaveNumber * RECEIVE_LEN), rxBuffer);
 
     AE_LTC_CS_OFF();
 
@@ -798,7 +798,7 @@ void AE_ltcBalance(Ltc682x * ltcBat, float minVoltage)
 {
     uint16_t maskedDCC;
 
-//    minVoltage += 0.003f;       //!< optimization
+    minVoltage += 0.003f;       //!< adc error optimization
 
     //clear the configuration register-A
     memset((void*)&ltcBat->cfgAr.CFGAR0.cfg, 0, sizeof(CFGAR));
