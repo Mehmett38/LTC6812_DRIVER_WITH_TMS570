@@ -117,10 +117,7 @@ void AE_ltcCmdWrite(uint16_t cmd[4])
 
     AE_LTC_CS_ON();
 
-    for(i = 0; i < slaveNumber; i++)
-    {
-        spiTransmitData(ltcSpi_ps, &spiDat_s, CMD_LEN, cmd);
-    }
+    spiTransmitData(ltcSpi_ps, &spiDat_s, CMD_LEN, cmd);
 
     AE_LTC_CS_OFF();
 
@@ -458,11 +455,14 @@ void AE_ltcStartGpioAdc(Ltc682x * ltcBat, AdcMode adcMode, uint8_t GPIO_)
 
     if(adcMode & 0x10)
     {
-        if(!ltcBat->cfgAr.CFGAR0.ADCOPT)
+        for(i = 0; i < slaveNumber; i++)
         {
-            ltcBat->cfgAr.CFGAR0.ADCOPT = 1;
-            AE_ltcWrite((uint16_t*)&ltcBat->cfgAr.CFGAR0, cmdWRCFGA_pu16);
+            if(!ltcBat[i].cfgAr.CFGAR0.ADCOPT)
+            {
+                ltcBat[i].cfgAr.CFGAR0.ADCOPT = 1;
+            }
         }
+        AE_ltcWrite((uint16_t*)&ltcBat[0].cfgAr, cmdWRCFGA_pu16);
     }
 
     adax |= (adcMode & 0x0F) << 7;
@@ -483,45 +483,53 @@ void AE_ltcStartGpioAdc(Ltc682x * ltcBat, AdcMode adcMode, uint8_t GPIO_)
  * @param[in] assign to ltcBatGpio
  * @return if pec is true OK else
  */
-LTC_status AE_ltcReadGPIOVoltage(Ltc682x * ltcBat)
+LTC_status AE_ltcReadGpioVoltage(Ltc682x * ltcBat)
 {
     LTC_status status;
-    float * fptr = (float*)&ltcBat->gpio.gpio1;
+    float * fLtcPtr = NULL;                 // To access each index separately
+    uint16_t * fRxPtr = NULL;               // to access the rx buffer's 8k index
+    uint8_t j;                              // counter
 
-    //!< voltage register Group A
-    status = AE_ltcRead(rxBuffer, cmdRDAUXA_pu16);
-    if(status == LTC_WRONG_CRC) return status;
+    for(j = 0; j < slaveNumber; j++)
+    {
+        //!< voltage register Group A
+        status = AE_ltcRead(rxBuffer, cmdRDAUXA_pu16);
+        if(status == LTC_WRONG_CRC) return status;
 
-    for(i = 0; i < 3; i++)
-    {   //offset + 12
-        fptr[i] = ((rxBuffer[i*2] << 0) | (rxBuffer[i*2 + 1] << 8)) / 10000.0;  //!< 10000 comes from datasheet
-    }
+        fLtcPtr = &ltcBat[j].gpio.gpio1;    // to access the voltage register index by index
+        fRxPtr = &rxBuffer[j * RECEIVE_LEN];
 
-    //!< voltage register Group B
-    status = AE_ltcRead(rxBuffer, cmdRDAUXB_pu16);
-    if(status == LTC_WRONG_CRC) return status;
+        for(i = 0; i < 3; i++)
+        {   //offset + 12
+            fLtcPtr[i] = ((fRxPtr[i*2] << 0) | (fRxPtr[i*2 + 1] << 8)) / 10000.0;  //!< 10000 comes from datasheet
+        }
 
-    for(i = 0; i < 3; i++)
-    {   //offset + 12
-        fptr[i + 3] = ((rxBuffer[i*2] << 0) | (rxBuffer[i*2 + 1] << 8)) / 10000.0;  //!< 10000 comes from datasheet
-    }
+        //!< voltage register Group B
+        status = AE_ltcRead(rxBuffer, cmdRDAUXB_pu16);
+        if(status == LTC_WRONG_CRC) return status;
 
-    //!< voltage register Group C
-    status = AE_ltcRead(rxBuffer, cmdRDAUXC_pu16);
-    if(status == LTC_WRONG_CRC) return status;
+        for(i = 0; i < 3; i++)
+        {   //offset + 12
+            fLtcPtr[i + 3] = ((fRxPtr[i*2] << 0) | (fRxPtr[i*2 + 1] << 8)) / 10000.0;  //!< 10000 comes from datasheet
+        }
 
-    for(i = 0; i < 3; i++)
-    {   //offset + 12
-        fptr[i + 6] = ((rxBuffer[i*2] << 0) | (rxBuffer[i*2 + 1] << 8)) / 10000.0;  //!< 10000 comes from datasheet
-    }
+        //!< voltage register Group C
+        status = AE_ltcRead(rxBuffer, cmdRDAUXC_pu16);
+        if(status == LTC_WRONG_CRC) return status;
 
-    //!< voltage register Group D
-    status = AE_ltcRead(rxBuffer, cmdRDAUXD_pu16);
-    if(status == LTC_WRONG_CRC) return status;
+        for(i = 0; i < 3; i++)
+        {   //offset + 12
+            fLtcPtr[i + 6] = ((fRxPtr[i*2] << 0) | (fRxPtr[i*2 + 1] << 8)) / 10000.0;  //!< 10000 comes from datasheet
+        }
 
-    for(i = 0; i < 1; i++)
-    {   //offset + 12
-        fptr[i + 9] = ((rxBuffer[i*2] << 0) | (rxBuffer[i*2 + 1] << 8)) / 10000.0;  //!< 10000 comes from datasheet
+        //!< voltage register Group D
+        status = AE_ltcRead(rxBuffer, cmdRDAUXD_pu16);
+        if(status == LTC_WRONG_CRC) return status;
+
+        for(i = 0; i < 1; i++)
+        {   //offset + 12
+            fLtcPtr[i + 9] = ((fRxPtr[i*2] << 0) | (fRxPtr[i*2 + 1] << 8)) / 10000.0;  //!< 10000 comes from datasheet
+        }
     }
 
     return status;
@@ -541,11 +549,14 @@ void AE_ltcStartStatusAdc(Ltc682x * ltcBat, AdcMode adcMode, uint8_t CHST_)
 
     if(adcMode & 0x10)
     {
-        if(!ltcBat->cfgAr.CFGAR0.ADCOPT)
+        for(i = 0; i < slaveNumber; i++)
         {
-            ltcBat->cfgAr.CFGAR0.ADCOPT = 1;
-            AE_ltcWrite((uint16_t*)&ltcBat->cfgAr.CFGAR0, cmdWRCFGA_pu16);
+            if(!ltcBat[i].cfgAr.CFGAR0.ADCOPT)
+            {
+                ltcBat[i].cfgAr.CFGAR0.ADCOPT = 1;
+            }
         }
+        AE_ltcWrite((uint16_t*)&ltcBat[0].cfgAr, cmdWRCFGA_pu16);
     }
 
     adstat |= (adcMode & 0x0F) << 7;
@@ -570,20 +581,26 @@ LTC_status AE_ltcReadStatusRegA(Ltc682x * ltcBat)
 {
     LTC_status status;
 
-    float *fptr = (float*)&ltcBat->statusRegA.sumOfCell;
+    float * fLtcPtr = NULL;                 // To access each index separately
+    uint16_t * fRxPtr = NULL;                  // to access the rx buffer's 8k index
 
     status = AE_ltcRead(rxBuffer, cmdRDSTATA_pu16);
     if(status == LTC_WRONG_CRC) return status;
 
+    for(i = 0; i < slaveNumber; i++)
+    {
+        fLtcPtr = (float *)&ltcBat[i].statusRegA.sumOfCell;
+        fRxPtr = &rxBuffer[i * RECEIVE_LEN];
 
-    fptr[0] = rxBuffer[0] | rxBuffer[1] << 8;
-    fptr[0] = fptr[0] / 10000.0 * 30.0;                 //Cells Voltage = SC • 100μV • 30
+        fLtcPtr[0] = fRxPtr[0] | fRxPtr[1] << 8;
+        fLtcPtr[0] = fLtcPtr[0] / 10000.0 * 30.0;                 //Cells Voltage = SC • 100μV • 30
 
-    fptr[1] = rxBuffer[2] | rxBuffer[3] << 8;
-    fptr[1] = fptr[1] * 100.0 / 7.6 /1000.0 - 276;      //ITMP • 100μV/7.6mV/C – 276C
+        fLtcPtr[1] = fRxPtr[2] | fRxPtr[3] << 8;
+        fLtcPtr[1] = fLtcPtr[1] * 100.0 / 7.6 /1000.0 - 276;      //ITMP • 100μV/7.6mV/C – 276C
 
-    fptr[2] = rxBuffer[4] | rxBuffer[5] << 8;
-    fptr[2] = fptr[2] / 10000.0;                        //Analog Power Supply Voltage = VA • 100μV
+        fLtcPtr[2] = fRxPtr[4] | fRxPtr[5] << 8;
+        fLtcPtr[2] = fLtcPtr[2] / 10000.0;                        //Analog Power Supply Voltage = VA • 100μV
+    }
 
     return status;
 }
@@ -662,7 +679,7 @@ LTC_status AE_ltcClearGpioAdc(Ltc682x * ltcBat)
 
     AE_ltcCmdWrite(cmdCLRAUX_pu16);
 
-    status = AE_ltcReadGPIOVoltage(ltcBat);
+    status = AE_ltcReadGpioVoltage(ltcBat);
     if(status == LTC_WRONG_CRC) return status;
 
     if(ltcBat->gpio.gpio1 > 6.5)        //!< //!< if adc conversion is close read the pin 0xFF but this variable is
@@ -1073,7 +1090,7 @@ double AE_ltcTemperature(Ltc682x * ltcBat)
 {
     AE_ltcStartGpioAdc(ltcBat, MODE_7KHZ, GPIO_ALL);
     while(!AE_ltcAdcMeasureState());
-    AE_ltcReadGPIOVoltage(ltcBat);
+    AE_ltcReadGpioVoltage(ltcBat);
 
     return AE_calculateTemp(ltcBat->gpio.gpio3, ltcBat->gpio.ref, PULL_DOWN);
 }

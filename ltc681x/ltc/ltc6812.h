@@ -531,7 +531,7 @@ void AE_ltcSetUnderOverVoltage(Ltc682x * ltcBat, float underVolt, float overVolt
 LTC_status AE_ltcUnderOverFlag(Ltc682x * ltcBat);
 
 void AE_ltcStartGpioAdc(Ltc682x * ltcBat, AdcMode adcMode, uint8_t GPIO_);
-LTC_status AE_ltcReadGPIOVoltage(Ltc682x * ltcBat);
+LTC_status AE_ltcReadGpioVoltage(Ltc682x * ltcBat);
 LTC_status AE_ltcClearGpioAdc(Ltc682x * ltcBat);
 
 void AE_ltcStartStatusAdc(Ltc682x * ltcBat, AdcMode adcMode, uint8_t GPIO_);

@@ -169,16 +169,16 @@ float minVolt;
 #endif
 
 #if 0   // GPIO voltage Measure
-        AE_ltcStartGpioAdc(&ltcBat, MODE_7KHZ, GPIO_ALL);
+        AE_ltcStartGpioAdc(ltcBat, MODE_7KHZ, GPIO_ALL);
         while(!AE_ltcAdcMeasureState());
-        status = AE_ltcReadGPIOVoltage(&ltcBat);
+        status = AE_ltcReadGpioVoltage(ltcBat);
 #endif
 
-#if 0   //read status registerA
-        AE_ltcStartStatusAdc(&ltcBat, MODE_7KHZ, CHST_ALL);
+#if 0   //read status registerA     !!! SLAVE HATALI VERI OKUYOR
+        AE_ltcStartStatusAdc(ltcBat, MODE_7KHZ, CHST_ALL);
         //!< check adcMeasure duration is completed
         while(!AE_ltcAdcMeasureState());
-        status = AE_ltcReadStatusRegA(&ltcBat);
+        status = AE_ltcReadStatusRegA(ltcBat);
 #endif
 
 #if 0   //read status registerB
