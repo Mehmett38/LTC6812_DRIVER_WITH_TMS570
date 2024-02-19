@@ -142,9 +142,11 @@
 #define PWM_DUTY_LEVEL_14               (14)
 #define PWM_DUTY_LEVEL_15               (15)    //!< %100
 
+//<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<-GLOBAL VARIABLES->>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+extern spiBASE_t * ltcSpi_ps;                                 // spi base address
 
-#define AE_LTC_CS_ON()                  (spiREG3->PC3 &= ~(1 << 0)) //drive low the cs0 pin
-#define AE_LTC_CS_OFF()                 (spiREG3->PC3 |= 1 << 0)    //drive hight the cs0 pins
+#define AE_LTC_CS_ON()                  (ltcSpi_ps->PC3 &= ~(1 << 0)) //drive low the cs0 pin
+#define AE_LTC_CS_OFF()                 (ltcSpi_ps->PC3 |= 1 << 0)    //drive hight the cs0 pins
 
 //<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<-ENUMS->>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 typedef enum{

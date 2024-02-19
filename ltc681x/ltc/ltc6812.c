@@ -11,12 +11,12 @@
 static uint16_t txBuffer[256];
 static uint16_t rxBuffer[256];
 volatile uint32_t uwTick;
-static spiBASE_t * ltcSpi_ps;                                           // spi base address
-static uint8_t slaveNumber;                                                    // bms total connection
+spiBASE_t * ltcSpi_ps;                                           // spi base address
+static uint8_t slaveNumber;                                             // bms total connection
 static uint16_t i;                                                      // counter
-static uint16_t dummy_u16 = 0xFF;                                              // dummy variable
+static uint16_t dummy_u16 = 0xFF;                                       // dummy variable
 static LTC_status balanceStatus = LTC_BALANCE_COMPLETED;
-static spiDAT1_t spiDat_s =                                                    // spi configuration parameters
+static spiDAT1_t spiDat_s =                                             // spi configuration parameters
 {
      .CSNR = 0,
      .CS_HOLD = 1,
@@ -963,8 +963,8 @@ LTC_status AE_ltcIsCellOpenWire(Ltc682x * ltcBat, AdcMode adcMode, uint8_t CELL_
     cellPd = (float*)&bmsTest2.volt.cell1;
 
     for(i = 1; i < ltcBat->batConf.numberOfSerialCell; i++) //cell 2-15
-    {   // -0.400 comes from data sheet
-        if((cellPu[i] - cellPd[i]) < -0.400)    return LTC_OPEN_WIRE;
+    {   // -0.100 comes from data sheet
+        if((cellPu[i] - cellPd[i]) < -0.100)    return LTC_OPEN_WIRE;
     }
 
     return LTC_OK;
@@ -1043,7 +1043,7 @@ LTC_status AE_ltcIsGpioOpenWire(Ltc682x * ltcBat, AdcMode adcMode, uint8_t CELL_
 
     for(i = 1; i < 9; i++) //gio 1-9
     {
-        if((gioPU[i] - gioPd[i]) < -0.400)    return LTC_OPEN_WIRE;
+        if((gioPU[i] - gioPd[i]) < -0.100)    return LTC_OPEN_WIRE;
     }
 
     return LTC_OK;
