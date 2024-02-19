@@ -43,23 +43,27 @@ void AE_ltcInit(spiBASE_t * spi, Ltc682x * ltcBat)
     pwmStart(hetRAM1, pwm0);
 
     ltcSpi_ps = spi;
-    slaveNumber = ltcBat->batConf.numberOfSlave;
+    slaveNumber = ltcBat[0].batConf.numberOfSlave;
 
-    memset(&ltcBat->cfgAr, 0, sizeof(CFGAR));
-    memset(&ltcBat->cfgBr, 0, sizeof(CFGBR));
+    for(i = 0; i < slaveNumber; i++)
+    {
+        memset(&ltcBat[i].cfgAr, 0, sizeof(CFGAR));
+        memset(&ltcBat[i].cfgBr, 0, sizeof(CFGBR));
 
-    //!< configuration register A
-    ltcBat->cfgAr.CFGAR0.ADCOPT |= ltcBat->batConf.adcopt;              // adc speed mode selection
-    ltcBat->cfgAr.CFGAR0.REFON |= ltcBat->batConf.refon;                // power up untill watchdog
-    ltcBat->cfgAr.CFGAR0.cfg |= ltcBat->batConf.gioAPullOffPin << 2;    // GPIO1 located 1st index and Register start location
-                                                                        // at 3th index so we must shift 2 bit left
+        //!< configuration register A
+        ltcBat[i].cfgAr.CFGAR0.ADCOPT |= ltcBat[i].batConf.adcopt;              // adc speed mode selection
+        ltcBat[i].cfgAr.CFGAR0.REFON |= ltcBat[i].batConf.refon;                // power up untill watchdog
+        ltcBat[i].cfgAr.CFGAR0.cfg |= ltcBat[i].batConf.gioAPullOffPin << 2;    // GPIO1 located 1st index and Register start location
+                                                                            // at 3th index so we must shift 2 bit left
 
-    //!< configuration register B
-    ltcBat->cfgBr.CFGBR0.cfg |= ltcBat->batConf.gioBPullOffPin >> 6;    // GPIO6 located 6th index and Register start location
-                                                                        // at 0th index so we must shift 6 bit right
+        //!< configuration register B
+        ltcBat[i].cfgBr.CFGBR0.cfg |= ltcBat[i].batConf.gioBPullOffPin >> 6;    // GPIO6 located 6th index and Register start location
+                                                                            // at 0th index so we must shift 6 bit right
+    }
 
-    AE_ltcWrite((uint16_t*)&ltcBat->cfgAr, cmdWRCFGA_pu16);             // write to configuration register
-    AE_ltcWrite((uint16_t*)&ltcBat->cfgBr, cmdWRCFGB_pu16);             // write to configuration register
+
+    AE_ltcWrite((uint16_t*)&ltcBat[0].cfgAr, cmdWRCFGA_pu16);             // write to configuration register
+    AE_ltcWrite((uint16_t*)&ltcBat[0].cfgBr, cmdWRCFGB_pu16);             // write to configuration register
 }
 
 /**
@@ -113,7 +117,10 @@ void AE_ltcCmdWrite(uint16_t cmd[4])
 
     AE_LTC_CS_ON();
 
-    spiTransmitData(ltcSpi_ps, &spiDat_s, CMD_LEN, cmd);
+    for(i = 0; i < slaveNumber; i++)
+    {
+        spiTransmitData(ltcSpi_ps, &spiDat_s, CMD_LEN, cmd);
+    }
 
     AE_LTC_CS_OFF();
 
@@ -135,6 +142,7 @@ LTC_status AE_ltcRead(uint16_t * rxData, uint16_t cmd[4])
 
     AE_LTC_CS_ON();
 
+
     spiTransmitData(ltcSpi_ps, &spiDat_s, 4, cmd);
     spiReceiveData(ltcSpi_ps, &spiDat_s, (slaveNumber * RECEIVE_LEN), rxBuffer);
 
@@ -151,7 +159,7 @@ LTC_status AE_ltcRead(uint16_t * rxData, uint16_t cmd[4])
 
         for(j = 0; j < RECEIVE_LEN; j++)
         {
-            rxData[j] = rxBuffer[RECEIVE_LEN * i + j];  //!NOTE çoklu slave için rxData[i][j] eklenecek
+            rxData[j + i * RECEIVE_LEN] = rxBuffer[RECEIVE_LEN * i + j];  //!NOTE çoklu slave için rxData[i][j] eklenecek
         }
     }
 
@@ -261,51 +269,55 @@ LTC_status AE_ltcReadConfRegB(Ltc682x * ltcBat)
 LTC_status AE_ltcReadCellVoltage(Ltc682x * ltcBat)
 {
     LTC_status status;
-    float * fptr = (float*)&ltcBat->volt.cell1;                 // To access each index separately
+    float * fLtcPtr = NULL;                 // To access each index separately
+    uint16_t * fRxPtr = NULL;                  // to access the rx buffer's 8k index
+    uint8_t j;                              // counter
 
-    //!< voltage register Group A
-    status = AE_ltcRead(rxBuffer, cmdRDCVA_pu16);
-    if(status == LTC_WRONG_CRC) return status;
+    for(j = 0; j < slaveNumber; j++)
+    {
+        //!< voltage register Group A
+        status = AE_ltcRead(rxBuffer, cmdRDCVA_pu16);
+        if(status == LTC_WRONG_CRC) return status;
 
-    for(i = 0; i < 3; i++)
-    {   //offset = 0
-        fptr[i] = ((rxBuffer[i*2] << 0) | (rxBuffer[i*2 + 1] << 8)) / 10000.0;  //!< 10000 comes from datasheet
-    }
+        fLtcPtr = &ltcBat[j].volt.cell1;    // to access the voltage register index by index
+        fRxPtr = &rxBuffer[j * RECEIVE_LEN];
 
-    //!< voltage register Group B
-    status = AE_ltcRead(rxBuffer, cmdRDCVB_pu16);
-    if(status == LTC_WRONG_CRC) return status;
+        for(i = 0; i < 3; i++)
+        {   //offset = 0
+            fLtcPtr[i] = ((fRxPtr[i*2] << 0) | (fRxPtr[i*2 + 1] << 8)) / 10000.0;  //!< 10000 comes from datasheet
+        }
 
-    for(i = 0; i < 3; i++)
-    {   //offset = 3
-        fptr[i + 3] = ((rxBuffer[i*2] << 0) | (rxBuffer[i*2 + 1] << 8)) / 10000.0;  //!< 10000 comes from datasheet
-    }
+        //!< voltage register Group B
+        status = AE_ltcRead(rxBuffer, cmdRDCVB_pu16);
+        if(status == LTC_WRONG_CRC) return status;
+        for(i = 0; i < 3; i++)
+        {   //offset = 3
+            fLtcPtr[i + 3] = ((fRxPtr[i*2] << 0) | (fRxPtr[i*2 + 1] << 8)) / 10000.0;  //!< 10000 comes from datasheet
+        }
 
-    //!< voltage register Group C
-    status = AE_ltcRead(rxBuffer, cmdRDCVC_pu16);
-    if(status == LTC_WRONG_CRC) return status;
+        //!< voltage register Group C
+        status = AE_ltcRead(rxBuffer, cmdRDCVC_pu16);
+        if(status == LTC_WRONG_CRC) return status;
+        for(i = 0; i < 3; i++)
+        {   //offset = 6
+            fLtcPtr[i + 6] = ((fRxPtr[i*2] << 0) | (fRxPtr[i*2 + 1] << 8)) / 10000.0;  //!< 10000 comes from datasheet
+        }
 
-    for(i = 0; i < 3; i++)
-    {   //offset = 6
-        fptr[i + 6] = ((rxBuffer[i*2] << 0) | (rxBuffer[i*2 + 1] << 8)) / 10000.0;  //!< 10000 comes from datasheet
-    }
+        //!< voltage register Group D
+        status = AE_ltcRead(rxBuffer, cmdRDCVD_pu16);
+        if(status == LTC_WRONG_CRC) return status;
+        for(i = 0; i < 3; i++)
+        {   //offset = 9
+            fLtcPtr[i + 9] = ((fRxPtr[i*2] << 0) | (fRxPtr[i*2 + 1] << 8)) / 10000.0;  //!< 10000 comes from datasheet
+        }
 
-    //!< voltage register Group D
-    status = AE_ltcRead(rxBuffer, cmdRDCVD_pu16);
-    if(status == LTC_WRONG_CRC) return status;
-
-    for(i = 0; i < 3; i++)
-    {   //offset = 9
-        fptr[i + 9] = ((rxBuffer[i*2] << 0) | (rxBuffer[i*2 + 1] << 8)) / 10000.0;  //!< 10000 comes from datasheet
-    }
-
-    //!< voltage register Group E
-    status = AE_ltcRead(rxBuffer, cmdRDCVE_pu16);
-    if(status == LTC_WRONG_CRC) return status;
-
-    for(i = 0; i < 3; i++)
-    {   //offset = 12
-        fptr[i + 12] = ((rxBuffer[i*2] << 0) | (rxBuffer[i*2 + 1] << 8)) / 10000.0;  //!< 10000 comes from datasheet
+        //!< voltage register Group E
+        status = AE_ltcRead(rxBuffer, cmdRDCVE_pu16);
+        if(status == LTC_WRONG_CRC) return status;
+        for(i = 0; i < 3; i++)
+        {   //offset = 12
+            fLtcPtr[i + 12] = ((fRxPtr[i*2] << 0) | (fRxPtr[i*2 + 1] << 8)) / 10000.0;  //!< 10000 comes from datasheet
+        }
     }
 
     return status;
@@ -395,11 +407,14 @@ void AE_ltcStartCellAdc(Ltc682x * ltcBat, AdcMode adcMode, uint8_t dischargePerm
 
     if(adcMode & 0x10)
     {
-        if(!ltcBat->cfgAr.CFGAR0.ADCOPT)
+        for(i = 0; i < slaveNumber; i++)
         {
-            ltcBat->cfgAr.CFGAR0.ADCOPT = 1;
-            AE_ltcWrite((uint16_t*)&ltcBat->cfgAr, cmdWRCFGA_pu16);
+            if(!ltcBat[i].cfgAr.CFGAR0.ADCOPT)
+            {
+                ltcBat[i].cfgAr.CFGAR0.ADCOPT = 1;
+            }
         }
+        AE_ltcWrite((uint16_t*)&ltcBat[0].cfgAr, cmdWRCFGA_pu16);
     }
 
     adcvReg |= (adcMode << 7);

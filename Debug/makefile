@@ -167,15 +167,15 @@ EXE_OUTPUTS__QUOTED += \
 "009_Ltc6812.out" \
 
 BIN_OUTPUTS += \
-009_Ltc6812.hex \
+009_Ltc6812.bin \
 
 BIN_OUTPUTS__QUOTED += \
-"009_Ltc6812.hex" \
+"009_Ltc6812.bin" \
 
 
 # All Target
 all: $(OBJS) $(CMD_SRCS) $(GEN_CMDS)
-	@$(MAKE) --no-print-directory -Onone "009_Ltc6812.out" secondary-outputs
+	@$(MAKE) --no-print-directory -Onone "009_Ltc6812.out"
 
 # Tool invocations
 009_Ltc6812.out: $(OBJS) $(CMD_SRCS) $(GEN_CMDS)
@@ -184,11 +184,12 @@ all: $(OBJS) $(CMD_SRCS) $(GEN_CMDS)
 	"C:/ti/ccs1120/ccs/tools/compiler/ti-cgt-arm_20.2.5.LTS/bin/armcl" -mv7R4 --code_state=32 --float_support=VFPv3D16 -g --diag_warning=225 --diag_wrap=off --display_error_number --enum_type=packed --abi=eabi -z -m"009_Ltc6812.map" --heap_size=0x800 --stack_size=0x800 -i"C:/ti/ccs1120/ccs/tools/compiler/ti-cgt-arm_20.2.5.LTS/lib" -i"C:/ti/ccs1120/ccs/tools/compiler/ti-cgt-arm_20.2.5.LTS/include" --reread_libs --diag_wrap=off --display_error_number --warn_sections --xml_link_info="009_Ltc6812_linkInfo.xml" --rom_model --be32 -o "009_Ltc6812.out" $(ORDERED_OBJS)
 	@echo 'Finished building target: "$@"'
 	@echo ' '
+	@$(MAKE) --no-print-directory post-build
 
-009_Ltc6812.hex: $(EXE_OUTPUTS)
+009_Ltc6812.bin: $(EXE_OUTPUTS)
 	@echo 'Building secondary target: "$@"'
 	@echo 'Invoking: Arm Hex Utility'
-	"C:/ti/ccs1120/ccs/tools/compiler/ti-cgt-arm_20.2.5.LTS/bin/armhex" --diag_wrap=off -o "009_Ltc6812.hex" $(EXE_OUTPUTS__QUOTED)
+	"C:/ti/ccs1120/ccs/tools/compiler/ti-cgt-arm_20.2.5.LTS/bin/armhex" --diag_wrap=off -o "009_Ltc6812.bin" $(EXE_OUTPUTS__QUOTED)
 	@echo 'Finished building secondary target: "$@"'
 	@echo ' '
 	@$(MAKE) --no-print-directory post-build
@@ -206,8 +207,6 @@ clean:
 post-build:
 	-"C:/ti/ccs1120/ccs/utils/tiobj2bin/tiobj2bin" "009_Ltc6812.out" "009_Ltc6812.bin" "C:/ti/ccs1120/ccs/tools/compiler/ti-cgt-arm_20.2.5.LTS/bin/armofd" "C:/ti/ccs1120/ccs/tools/compiler/ti-cgt-arm_20.2.5.LTS/bin/armhex" "C:/ti/ccs1120/ccs/utils/tiobj2bin/mkhex4bin"
 	-@echo ' '
-
-secondary-outputs: $(BIN_OUTPUTS)
 
 .PHONY: all clean dependents
 .SECONDARY:

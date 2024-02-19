@@ -64,7 +64,9 @@
 */
 
 /* USER CODE BEGIN (2) */
-Ltc682x ltcBat = {0};
+#define SLAVE_NUMBER                    (2)
+
+Ltc682x ltcBat[SLAVE_NUMBER] = {0};
 
 void ltcInit(spiBASE_t * spiReg);
 
@@ -140,7 +142,6 @@ float minVolt;
 
     while(1)
     {
-
 #if 0   //balance in polling
         AE_ltcBalance(&ltcBat, minVolt);
 #endif
@@ -161,10 +162,10 @@ float minVolt;
 #endif
 
 #if 1   // read the cell voltage
-        AE_ltcStartCellAdc(&ltcBat, MODE_7KHZ, true, CELL_ALL);
+        AE_ltcStartCellAdc(ltcBat, MODE_7KHZ, true, CELL_ALL);
         //!< check adcMeasure duration is completed
         while(!AE_ltcAdcMeasureState());
-        status = AE_ltcReadCellVoltage(&ltcBat);
+        status = AE_ltcReadCellVoltage(ltcBat);
 #endif
 
 #if 0   // GPIO voltage Measure
@@ -330,16 +331,20 @@ float minVolt;
 
 void ltcInit(spiBASE_t * spiReg)
 {
-    ltcBat.batConf.adcopt = false;          //ADC conversion mode selection, if 1->14kHz, 3kHz, 1kHz or 2kHz, 0-> 27kHz, 7kHz, 422Hz or 26Hz
-    ltcBat.batConf.refon = true;            //referances remain powered on until watchog timeout
+    uint8_t i = 0;
+    for(; i < SLAVE_NUMBER; i++)
+    {
+        ltcBat[i].batConf.adcopt = false;          //ADC conversion mode selection, if 1->14kHz, 3kHz, 1kHz or 2kHz, 0-> 27kHz, 7kHz, 422Hz or 26Hz
+        ltcBat[i].batConf.refon = true;            //referances remain powered on until watchog timeout
 
-    ltcBat.batConf.gioAPullOffPin = GPIO_5 | GPIO_4 | GPIO_3;   // selected pin's pull down off
-    ltcBat.batConf.gioBPullOffPin = GPIO_8 | GPIO_7 | GPIO_6;   // selected pin's pull down off
+        ltcBat[i].batConf.gioAPullOffPin = GPIO_5 | GPIO_4 | GPIO_3;   // selected pin's pull down off
+        ltcBat[i].batConf.gioBPullOffPin = GPIO_8 | GPIO_7 | GPIO_6;   // selected pin's pull down off
 
-    ltcBat.batConf.numberOfSerialCell = 13;                     // cell number in a slave
-    ltcBat.batConf.numberOfSlave = 1;                           // number of slave
+        ltcBat[i].batConf.numberOfSerialCell = 13;                     // cell number in a slave
+        ltcBat[i].batConf.numberOfSlave = SLAVE_NUMBER;                // number of slave
+    }
 
-    AE_ltcInit(spiReg, &ltcBat);
+    AE_ltcInit(spiReg, ltcBat);
 
     AE_delayMs(2);  // t-wakeup time
 }
