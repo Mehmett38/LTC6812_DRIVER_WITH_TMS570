@@ -466,6 +466,9 @@ typedef struct{
     Gpio gpio;
     StatusRegA statusRegA;
     StatusRegB statusRegB;
+    uint16_t pwmDuty[12];                /* ***Do not use this variable
+                                         pwm blocks valid on PWM Register Group and PWM/S Control Register
+                                         Group B so, send 12 bytes data*/
 }Ltc682x;
 
 

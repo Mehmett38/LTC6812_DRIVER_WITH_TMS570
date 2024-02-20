@@ -64,7 +64,7 @@
 */
 
 /* USER CODE BEGIN (2) */
-#define SLAVE_NUMBER                    (2)
+#define SLAVE_NUMBER           (2)  //!< assign number of slave
 
 Ltc682x ltcBat[SLAVE_NUMBER] = {0};
 
@@ -147,8 +147,8 @@ float minVolt;
 #endif
 //<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<-LTC V2.0->>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 #if 0
-        AE_ltcSetUnderOverVoltage(&ltcBat, min, 4.2f);
-        status = AE_ltcIsBalanceComplete(&ltcBat);
+        AE_ltcSetUnderOverVoltage(ltcBat, min, 4.2f);
+        status = AE_ltcIsBalanceComplete(ltcBat);
         if(status == LTC_BALANCE_COMPLETED)
         {
             int a = 10;
@@ -174,41 +174,36 @@ float minVolt;
         status = AE_ltcReadGpioVoltage(ltcBat);
 #endif
 
-#if 0   //read status registerA     !!! SLAVE HATALI VERI OKUYOR
+#if 0   //read status registerA
         AE_ltcStartStatusAdc(ltcBat, MODE_7KHZ, CHST_ALL);
         //!< check adcMeasure duration is completed
         while(!AE_ltcAdcMeasureState());
         status = AE_ltcReadStatusRegA(ltcBat);
 #endif
 
-#if 1   //read status registerB
+#if 0   //read status registerB
         AE_ltcStartStatusAdc(ltcBat, MODE_7KHZ, CHST_ALL);
         //!< check adcMeasure duration is completed
         while(!AE_ltcAdcMeasureState());
         status = AE_ltcReadStatusRegB(ltcBat);
 #endif
 
-#if 0   // read the status register A
-        AE_ltcStartStatusAdc(&ltcBat, MODE_7KHZ, CHST_ALL);
-        while(!AE_ltcAdcMeasureState());
-        status = AE_ltcReadStatusRegA(&ltcBat);
-#endif
-
 #if 0   //internal die temperature
-        AE_ltcStartStatusAdc(&ltcBat, MODE_7KHZ, CHST_ALL);
+        AE_ltcStartStatusAdc(ltcBat, MODE_7KHZ, CHST_ALL);
         while(!AE_ltcAdcMeasureState());
-        AE_ltcReadStatusRegA(&ltcBat);
+        AE_ltcReadStatusRegA(ltcBat);
 
-        if(ltcBat.statusRegA.internalDieTemp > 150)    //configuration register is reset
+        // check for every slave
+        if(ltcBat[0].statusRegA.internalDieTemp > 150)    //configuration register is reset
         {
             /*the thermal shutdown circuit trips and resets the Configuration
              * Register Groups (except the MUTE bit) and turns off all discharge switches.*/
         }
 #endif
 
-#if 0   //pwm duty setting
-        AE_ltcStartPwm(&ltcBat, S_PIN_1 | S_PIN_2| S_PIN_3, PWM_DUTY_LEVEL_8);
-        AE_ltcStartPwm(&ltcBat, S_PIN_4 | S_PIN_5| S_PIN_6, PWM_DUTY_LEVEL_8);
+#if 1   //pwm duty setting after balance is open
+        AE_ltcStartPwm(ltcBat, S_PIN_1 | S_PIN_2| S_PIN_3, PWM_DUTY_LEVEL_8);
+        AE_ltcStartPwm(ltcBat, S_PIN_4 | S_PIN_5| S_PIN_6, PWM_DUTY_LEVEL_6);
 #endif
 
 #if 0   //pwm stop and continue commands

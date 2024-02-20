@@ -11,7 +11,7 @@
 static uint16_t txBuffer[256];
 static uint16_t rxBuffer[256];
 volatile uint32_t uwTick;
-spiBASE_t * ltcSpi_ps;                                           // spi base address
+spiBASE_t * ltcSpi_ps;                                                  // spi base address
 static uint8_t slaveNumber;                                             // bms total connection
 static uint16_t i;                                                      // counter
 static uint16_t dummy_u16 = 0xFF;                                       // dummy variable
@@ -78,21 +78,22 @@ void AE_ltcWrite(uint16_t * txData, uint16_t cmd[4])
     uint8_t j;
     uint16_t pec;
 
-    for(i = 0; i < CMD_LEN; i++)                                        // assign command and command pec
-    {
-        txBuffer[i] = cmd[i];
-    }
-
     for(i = 0; i < slaveNumber; i++)
     {
-        for(j = 0; j < REGISTER_LEN; j++)
+        for(j = 0; j < CMD_LEN; j++)                                    // assign command pec
         {
-            txBuffer[CMD_LEN + TRANSMIT_LEN * i + j] = txData[i * REGISTER_LEN + j];
+            txBuffer[j + i * (TRANSMIT_LEN + CMD_LEN)] = cmd[j];
         }
 
-        pec = AE_pec15((uint8_t*)&txData[i * TRANSMIT_LEN], 6);
-        txBuffer[CMD_LEN + TRANSMIT_LEN * i + 6] = (pec >> 8) & 0xFF;   // +6 = pec0 index
-        txBuffer[CMD_LEN + TRANSMIT_LEN * i + 7] = (pec >> 0) & 0xFF;   // +7 = pec1 index
+        for(j = 0; j < REGISTER_LEN; j++)
+        {   /*When the slaveNumber changes, slave offset must be added to the txData pointer
+            to ensure that it is transferred to the other slave.*/
+            txBuffer[CMD_LEN + (CMD_LEN +TRANSMIT_LEN) * i + j] = txData[(i * sizeof(Ltc682x) / sizeof(uint16_t)) + j];
+        }
+
+        pec = AE_pec15((uint8_t*)&txBuffer[i * (TRANSMIT_LEN + CMD_LEN)], 6);
+        txBuffer[CMD_LEN + (CMD_LEN +TRANSMIT_LEN) * i + 6] = (pec >> 8) & 0xFF;   // +6 = pec0 index
+        txBuffer[CMD_LEN + (CMD_LEN +TRANSMIT_LEN) * i + 7] = (pec >> 0) & 0xFF;   // +7 = pec1 index
     }
 
     AE_ltcWakeUpSleep();
@@ -732,8 +733,8 @@ LTC_status AE_ltcClearStatusAdc(Ltc682x * ltcBat)
  */
 void AE_ltcStartPwm(Ltc682x * ltcBat, uint16_t S_PIN_, uint8_t PWM_DUTY_LEVEL_)
 {
-    uint16_t pwmDuty[12] = {0};         //!< pwm blocks valid on PWM Register Group and PWM/S Control Register Group B
-                                        //!< so, send 12 bytes data
+    uint16_t pwmDuty[12] = {0};         /* pwm blocks valid on PWM Register Group and PWM/S Control Register Group B
+                                           so, send 12 bytes data*/
     uint8_t mode = 0;
     uint8_t index = 0;
 
