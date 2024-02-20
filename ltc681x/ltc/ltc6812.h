@@ -530,7 +530,7 @@ void AE_ltcStartCellAdc(Ltc682x * ltcBat, AdcMode adcMode, uint8_t dischargePerm
 LTC_status AE_ltcReadCellVoltage(Ltc682x * ltcBat);
 LTC_status AE_ltcClearCellAdc(Ltc682x * ltcBat);
 
-void AE_ltcSetUnderOverVoltage(Ltc682x * ltcBat, float underVolt, float overVolt);
+void AE_ltcSetUnderOverVoltage(Ltc682x * ltcBat, float * underVolt, float * overVolt);
 LTC_status AE_ltcUnderOverFlag(Ltc682x * ltcBat);
 
 void AE_ltcStartGpioAdc(Ltc682x * ltcBat, AdcMode adcMode, uint8_t GPIO_);

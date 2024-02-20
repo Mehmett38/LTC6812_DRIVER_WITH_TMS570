@@ -75,6 +75,8 @@ uint8_t toggle = 1;
 uint8_t returnVarningClose;
 LTC_status status;
 double temperature[SLAVE_NUMBER];
+float unverVoltage[SLAVE_NUMBER];
+float overVoltage[SLAVE_NUMBER];
 
 /* USER CODE END */
 
@@ -222,30 +224,27 @@ float minVolt;
 #endif
 
 #if 1   // when under and over limits are exceeded for cellx, x.th flag is raise
-        AE_ltcSetUnderOverVoltage(ltcBat, 3.0f, 4.2f);
+        unverVoltage[0] = 3.9f;     // undervoltage value for slave 1
+        unverVoltage[1] = 3.8f;     // undervoltage value for slave 2
+        overVoltage[0] = 4.1f;      // overvoltage value for slave 1
+        overVoltage[1] = 4.2f;      // overvoltage value for slave 2
+
+
+        AE_ltcSetUnderOverVoltage(ltcBat, unverVoltage, overVoltage);
 
         status = AE_ltcUnderOverFlag(ltcBat);
 
         if(ltcBat[0].statusRegB.CellOverFlag.cell1)
         {
-            int a = 10;
-        }
-        else
-        {
-            //cell 1 is less than limit
+            //cell1 over the overVoltage limit
         }
 
         if(ltcBat[0].statusRegB.CellUnderFlag.cell1)
         {
-            //cell 1 in undervoltage
-            int a = 10;
+            //cell1 under the underVoltage limit
         }
-        else
-        {
-            //cell 1 in over than sub limit
-        }
-#endif
 
+#endif
 
         //<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<BEFORE WORKING LTC V1.0>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 

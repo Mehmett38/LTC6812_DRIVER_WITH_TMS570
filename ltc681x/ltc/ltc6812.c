@@ -326,30 +326,36 @@ LTC_status AE_ltcReadCellVoltage(Ltc682x * ltcBat)
  * @param[in] overvoltage value
  * @return none
  */
-void AE_ltcSetUnderOverVoltage(Ltc682x * ltcBat, float underVolt, float overVolt)
+void AE_ltcSetUnderOverVoltage(Ltc682x * ltcBat, float * underVolt, float * overVolt)
 {
-    uint16_t underVoltTemp = underVolt * 625.0f - 1;
-    uint16_t overVoltTemp = overVolt * 625.0f;
+    for(i = 0; i < slaveNumber; i++)
+    {
+        ltcBat[i].cfgAr.CFGAR0.REFON = 1;
+    }
+
+    AE_ltcWrite((uint16_t*)&ltcBat[0].cfgAr, cmdWRCFGA_pu16);
 
     for(i = 0; i < slaveNumber; i++)
     {
+        underVolt[i] = underVolt[i] * 625.0 - 1;
+        overVolt[i] = overVolt[i] * 625;
+
         // clear voltage set register
         ltcBat[i].cfgAr.CFGAR1.cfg = 0;
         ltcBat[i].cfgAr.CFGAR2.cfg = 0;
         ltcBat[i].cfgAr.CFGAR3.cfg = 0;
 
         // configure the voltage
-        ltcBat[i].cfgAr.CFGAR0.DTEN = 1;
         ltcBat[i].cfgAr.CFGAR0.REFON = 1;
 
-        ltcBat[i].cfgAr.CFGAR1.cfg |= underVoltTemp & 0x00FF;
-        ltcBat[i].cfgAr.CFGAR2.cfg |= (underVoltTemp >> 8) & 0x000F;
+        ltcBat[i].cfgAr.CFGAR1.cfg |= (uint16_t)underVolt[i] & 0x00FF;
+        ltcBat[i].cfgAr.CFGAR2.cfg |= ((uint16_t)underVolt[i] >> 8) & 0x000F;
 
-        ltcBat[i].cfgAr.CFGAR2.cfg |= (overVoltTemp << 4) & 0x00F0;
-        ltcBat[i].cfgAr.CFGAR3.cfg |= (overVoltTemp >> 4) & 0x00FF;
+        ltcBat[i].cfgAr.CFGAR2.cfg |= ((uint16_t)overVolt[i] << 4) & 0x00F0;
+        ltcBat[i].cfgAr.CFGAR3.cfg |= ((uint16_t)overVolt[i] >> 4) & 0x00FF;
+
+        AE_ltcWrite((uint16_t*)&ltcBat->cfgAr, cmdWRCFGA_pu16);
     }
-
-    AE_ltcWrite((uint16_t*)&ltcBat[0].cfgAr, cmdWRCFGA_pu16);
 }
 
 LTC_status AE_ltcUnderOverFlag(Ltc682x * ltcBat)
@@ -625,20 +631,33 @@ LTC_status AE_ltcReadStatusRegB(Ltc682x * ltcBat)
 
         ltcBat[i].statusRegB.digitalPowerSupplyVolt = (fRxPtr[0] << 8 | fRxPtr[1])/10000.0;
 
-        //!< if you think this function looks like too complex, yes you are right
-        //!< if this function did not written like this, 24 line code is needed
-        //!< rxBuffer[i/4 + 2] => (+2) is offset related to Status Register Group B
-        //!< 0x02 << ((i % 4) * 2)) select the bit 1,3,5,7
-        //!< 0x01 << ((i % 4) * 2)) select the bit 0,2,4,6
-        //!< if that ↑ index is ( >0 ) assign this bit to (1 << i)
-        //!< 12 is flag number in status register B
-        for(i = 0; i < 12; i++)
-        {
-            ltcBat[i].statusRegB.CellOverFlag.flag |=
-                    ((fRxPtr[i / 4 + 2] & (0x02 << ((i % 4) * 2))) != 0) ? (1<<i) : 0;
-            ltcBat[i].statusRegB.CellUnderFlag.flag |=
-                    ((fRxPtr[i / 4 + 2] & (0x01 << ((i % 4) * 2))) != 0) ? (1<<i) : 0;
-        }
+        ltcBat[i].statusRegB.CellUnderFlag.cell1 = ((fRxPtr[2] >> 0 ) & 0x01);
+        ltcBat[i].statusRegB.CellOverFlag.cell1  = ((fRxPtr[2] >> 1 ) & 0x01);
+        ltcBat[i].statusRegB.CellUnderFlag.cell2 = ((fRxPtr[2] >> 2 ) & 0x01);
+        ltcBat[i].statusRegB.CellOverFlag.cell2  = ((fRxPtr[2] >> 3 ) & 0x01);
+        ltcBat[i].statusRegB.CellUnderFlag.cell3 = ((fRxPtr[2] >> 4 ) & 0x01);
+        ltcBat[i].statusRegB.CellOverFlag.cell3  = ((fRxPtr[2] >> 5 ) & 0x01);
+        ltcBat[i].statusRegB.CellUnderFlag.cell4 = ((fRxPtr[2] >> 6 ) & 0x01);
+        ltcBat[i].statusRegB.CellOverFlag.cell4  = ((fRxPtr[2] >> 7 ) & 0x01);
+
+        ltcBat[i].statusRegB.CellUnderFlag.cell5 = ((fRxPtr[3] >> 0 ) & 0x01);
+        ltcBat[i].statusRegB.CellOverFlag.cell5  = ((fRxPtr[3] >> 1 ) & 0x01);
+        ltcBat[i].statusRegB.CellUnderFlag.cell6 = ((fRxPtr[3] >> 2 ) & 0x01);
+        ltcBat[i].statusRegB.CellOverFlag.cell6  = ((fRxPtr[3] >> 3 ) & 0x01);
+        ltcBat[i].statusRegB.CellUnderFlag.cell7 = ((fRxPtr[3] >> 4 ) & 0x01);
+        ltcBat[i].statusRegB.CellOverFlag.cell7  = ((fRxPtr[3] >> 5 ) & 0x01);
+        ltcBat[i].statusRegB.CellUnderFlag.cell8 = ((fRxPtr[3] >> 6 ) & 0x01);
+        ltcBat[i].statusRegB.CellOverFlag.cell8  = ((fRxPtr[3] >> 7 ) & 0x01);
+
+        ltcBat[i].statusRegB.CellUnderFlag.cell9  = ((fRxPtr[4] >> 0 ) & 0x01);
+        ltcBat[i].statusRegB.CellOverFlag.cell9   = ((fRxPtr[4] >> 1 ) & 0x01);
+        ltcBat[i].statusRegB.CellUnderFlag.cell10 = ((fRxPtr[4] >> 2 ) & 0x01);
+        ltcBat[i].statusRegB.CellOverFlag.cell10  = ((fRxPtr[4] >> 3 ) & 0x01);
+        ltcBat[i].statusRegB.CellUnderFlag.cell11 = ((fRxPtr[4] >> 4 ) & 0x01);
+        ltcBat[i].statusRegB.CellOverFlag.cell11  = ((fRxPtr[4] >> 5 ) & 0x01);
+        ltcBat[i].statusRegB.CellUnderFlag.cell12 = ((fRxPtr[4] >> 6 ) & 0x01);
+        ltcBat[i].statusRegB.CellOverFlag.cell12  = ((fRxPtr[4] >> 7 ) & 0x01);
+
 
         ltcBat[i].statusRegB.thsd = fRxPtr[5] & 0x01;
         ltcBat[i].statusRegB.muxFail = (fRxPtr[5] >> 1) & 0x01;
