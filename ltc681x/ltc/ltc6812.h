@@ -554,7 +554,7 @@ float AE_ltcMinCellVolt(Ltc682x * ltcBat);
 LTC_status AE_ltcIsCellOpenWire(Ltc682x * ltcBat, AdcMode adcMode, uint8_t CELL_);
 LTC_status AE_ltcIsGpioOpenWire(Ltc682x * ltcBat, AdcMode adcMode, uint8_t CELL_);
 
-double AE_ltcTemperature(Ltc682x * ltcBat);
+void AE_ltcTemperature(Ltc682x * ltcBat, float * temperature);
 
 static void AE_ltcTick(uint32_t );
 uint32_t getUsTick();

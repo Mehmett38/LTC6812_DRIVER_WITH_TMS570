@@ -55,12 +55,10 @@ void AE_ltcInit(spiBASE_t * spi, Ltc682x * ltcBat)
         ltcBat[i].cfgAr.CFGAR0.REFON |= ltcBat[i].batConf.refon;                // power up untill watchdog
         ltcBat[i].cfgAr.CFGAR0.cfg |= ltcBat[i].batConf.gioAPullOffPin << 2;    // GPIO1 located 1st index and Register start location
                                                                             // at 3th index so we must shift 2 bit left
-
         //!< configuration register B
         ltcBat[i].cfgBr.CFGBR0.cfg |= ltcBat[i].batConf.gioBPullOffPin >> 6;    // GPIO6 located 6th index and Register start location
                                                                             // at 0th index so we must shift 6 bit right
     }
-
 
     AE_ltcWrite((uint16_t*)&ltcBat[0].cfgAr, cmdWRCFGA_pu16);             // write to configuration register
     AE_ltcWrite((uint16_t*)&ltcBat[0].cfgBr, cmdWRCFGB_pu16);             // write to configuration register
@@ -74,7 +72,7 @@ void AE_ltcInit(spiBASE_t * spi, Ltc682x * ltcBat)
  */
 void AE_ltcWrite(uint16_t * txData, uint16_t cmd[4])
 {
-    uint8_t bufferLen = CMD_LEN + slaveNumber * TRANSMIT_LEN;           // 4 = cmd, 8 = 6 byte data + 2 byte crc
+    uint8_t bufferLen = slaveNumber * (TRANSMIT_LEN + CMD_LEN);           // 4 = cmd, 8 = 6 byte data + 2 byte crc
     uint8_t j;
     uint16_t pec;
 
@@ -91,7 +89,7 @@ void AE_ltcWrite(uint16_t * txData, uint16_t cmd[4])
             txBuffer[CMD_LEN + (CMD_LEN +TRANSMIT_LEN) * i + j] = txData[(i * sizeof(Ltc682x) / sizeof(uint16_t)) + j];
         }
 
-        pec = AE_pec15((uint8_t*)&txBuffer[i * (TRANSMIT_LEN + CMD_LEN)], 6);
+        pec = AE_pec15((uint8_t*)& txData[(i * sizeof(Ltc682x) / sizeof(uint16_t))], 6);
         txBuffer[CMD_LEN + (CMD_LEN +TRANSMIT_LEN) * i + 6] = (pec >> 8) & 0xFF;   // +6 = pec0 index
         txBuffer[CMD_LEN + (CMD_LEN +TRANSMIT_LEN) * i + 7] = (pec >> 0) & 0xFF;   // +7 = pec1 index
     }
@@ -246,7 +244,7 @@ void AE_ltcWriteConfRegB(Ltc682x * ltcBat)
  */
 LTC_status AE_ltcReadConfRegA(Ltc682x * ltcBat)
 {
-    return AE_ltcRead((uint16_t*)&ltcBat->cfgAr.CFGAR0.cfg, cmdRDCFGA_pu16);
+    return AE_ltcRead((uint16_t*)&ltcBat[0].cfgAr.CFGAR0.cfg, cmdRDCFGA_pu16);
 }
 
 /**
@@ -330,25 +328,28 @@ LTC_status AE_ltcReadCellVoltage(Ltc682x * ltcBat)
  */
 void AE_ltcSetUnderOverVoltage(Ltc682x * ltcBat, float underVolt, float overVolt)
 {
-    uint16_t underVoltTemp = underVolt * 625.0 - 1;
-    uint16_t overVoltTemp = overVolt * 625;
+    uint16_t underVoltTemp = underVolt * 625.0f - 1;
+    uint16_t overVoltTemp = overVolt * 625.0f;
 
-    // clear voltage set register
-    ltcBat->cfgAr.CFGAR1.cfg = 0;
-    ltcBat->cfgAr.CFGAR2.cfg = 0;
-    ltcBat->cfgAr.CFGAR3.cfg = 0;
+    for(i = 0; i < slaveNumber; i++)
+    {
+        // clear voltage set register
+        ltcBat[i].cfgAr.CFGAR1.cfg = 0;
+        ltcBat[i].cfgAr.CFGAR2.cfg = 0;
+        ltcBat[i].cfgAr.CFGAR3.cfg = 0;
 
-    // configure the voltage
-    ltcBat->cfgAr.CFGAR0.DTEN = 1;
-    ltcBat->cfgAr.CFGAR0.REFON = 1;
+        // configure the voltage
+        ltcBat[i].cfgAr.CFGAR0.DTEN = 1;
+        ltcBat[i].cfgAr.CFGAR0.REFON = 1;
 
-    ltcBat->cfgAr.CFGAR1.cfg |= underVoltTemp & 0x00FF;
-    ltcBat->cfgAr.CFGAR2.cfg |= (underVoltTemp >> 8) & 0x000F;
+        ltcBat[i].cfgAr.CFGAR1.cfg |= underVoltTemp & 0x00FF;
+        ltcBat[i].cfgAr.CFGAR2.cfg |= (underVoltTemp >> 8) & 0x000F;
 
-    ltcBat->cfgAr.CFGAR2.cfg |= (overVoltTemp << 4) & 0x00F0;
-    ltcBat->cfgAr.CFGAR3.cfg |= (overVoltTemp >> 4) & 0x00FF;
+        ltcBat[i].cfgAr.CFGAR2.cfg |= (overVoltTemp << 4) & 0x00F0;
+        ltcBat[i].cfgAr.CFGAR3.cfg |= (overVoltTemp >> 4) & 0x00FF;
+    }
 
-    AE_ltcWrite((uint16_t*)&ltcBat->cfgAr, cmdWRCFGA_pu16);
+    AE_ltcWrite((uint16_t*)&ltcBat[0].cfgAr, cmdWRCFGA_pu16);
 }
 
 LTC_status AE_ltcUnderOverFlag(Ltc682x * ltcBat)
@@ -357,21 +358,17 @@ LTC_status AE_ltcUnderOverFlag(Ltc682x * ltcBat)
 
     // Although all other functions work in a single call, Status register group B does not work
     // To work this command cell read 3 times, I find this by trying
-    for(i = 0; i < 3; i++)
-    {
-        AE_ltcStartCellAdc(ltcBat, MODE_422HZ, true, CELL_ALL);
-        //!< check adcMeasure duration is completed
-        while(!AE_ltcAdcMeasureState());
-        status = AE_ltcReadCellVoltage(ltcBat);
 
-        if(status == LTC_WRONG_CRC) return LTC_WRONG_CRC;
-    }
+    AE_ltcStartCellAdc(ltcBat, MODE_7KHZ, true, CELL_ALL);
+    //!< check adcMeasure duration is completed
+    while(!AE_ltcAdcMeasureState());
+    status = AE_ltcReadCellVoltage(ltcBat);
+    if(status == LTC_WRONG_CRC) return LTC_WRONG_CRC;
 
     //read status register B, flags 1-12 located here
     AE_ltcStartStatusAdc(ltcBat, MODE_7KHZ, CHST_ALL);
     while(!AE_ltcAdcMeasureState());
     status = AE_ltcReadStatusRegB(ltcBat);
-
     if(status == LTC_WRONG_CRC) return LTC_WRONG_CRC;
 
     //read auxilary register D , flags 13-15 located here
@@ -381,13 +378,13 @@ LTC_status AE_ltcUnderOverFlag(Ltc682x * ltcBat)
     if(status == LTC_WRONG_CRC) return LTC_WRONG_CRC;
 
     //assign flags that come from auxilary groupd flags to status register B structure
-    ltcBat->statusRegB.CellUnderFlag.cell13 = (rxBuffer[4] >> 0) & 0x01;
-    ltcBat->statusRegB.CellUnderFlag.cell14 = (rxBuffer[4] >> 2) & 0x01;
-    ltcBat->statusRegB.CellUnderFlag.cell15 = (rxBuffer[4] >> 4) & 0x01;
+    ltcBat[0].statusRegB.CellUnderFlag.cell13 = (rxBuffer[4] >> 0) & 0x01;
+    ltcBat[0].statusRegB.CellUnderFlag.cell14 = (rxBuffer[4] >> 2) & 0x01;
+    ltcBat[0].statusRegB.CellUnderFlag.cell15 = (rxBuffer[4] >> 4) & 0x01;
 
-    ltcBat->statusRegB.CellOverFlag.cell13 = (rxBuffer[4] >> 1) & 0x01;
-    ltcBat->statusRegB.CellOverFlag.cell14 = (rxBuffer[4] >> 3) & 0x01;
-    ltcBat->statusRegB.CellOverFlag.cell15 = (rxBuffer[4] >> 5) & 0x01;
+    ltcBat[0].statusRegB.CellOverFlag.cell13 = (rxBuffer[4] >> 1) & 0x01;
+    ltcBat[0].statusRegB.CellOverFlag.cell14 = (rxBuffer[4] >> 3) & 0x01;
+    ltcBat[0].statusRegB.CellOverFlag.cell15 = (rxBuffer[4] >> 5) & 0x01;
 
     return LTC_OK;
 }
@@ -625,7 +622,6 @@ LTC_status AE_ltcReadStatusRegB(Ltc682x * ltcBat)
         fRxPtr = (uint16_t*)&rxBuffer[i * RECEIVE_LEN];
 
         memset((void*)&ltcBat[i].statusRegB.digitalPowerSupplyVolt, 0, sizeof(StatusRegB));
-
 
         ltcBat[i].statusRegB.digitalPowerSupplyVolt = (fRxPtr[0] << 8 | fRxPtr[1])/10000.0;
 
@@ -1113,13 +1109,16 @@ LTC_status AE_ltcIsGpioOpenWire(Ltc682x * ltcBat, AdcMode adcMode, uint8_t CELL_
  * @param[in] bms global variable
  * @return temperature in celcius
  */
-double AE_ltcTemperature(Ltc682x * ltcBat)
+void AE_ltcTemperature(Ltc682x * ltcBat, float * temperature)
 {
     AE_ltcStartGpioAdc(ltcBat, MODE_7KHZ, GPIO_ALL);
     while(!AE_ltcAdcMeasureState());
     AE_ltcReadGpioVoltage(ltcBat);
 
-    return AE_calculateTemp(ltcBat->gpio.gpio3, ltcBat->gpio.ref, PULL_DOWN);
+    for(i = 0; i < slaveNumber; i++)
+    {
+        temperature[i] = AE_calculateTemp(ltcBat[i].gpio.gpio3, ltcBat[i].gpio.ref, PULL_DOWN);
+    }
 }
 
 /**

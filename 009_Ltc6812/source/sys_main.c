@@ -64,7 +64,7 @@
 */
 
 /* USER CODE BEGIN (2) */
-#define SLAVE_NUMBER           (2)  //!< assign number of slave
+#define SLAVE_NUMBER           (1)  //!< assign number of slave
 
 Ltc682x ltcBat[SLAVE_NUMBER] = {0};
 
@@ -74,7 +74,7 @@ void ltcInit(spiBASE_t * spiReg);
 uint8_t toggle = 1;
 uint8_t returnVarningClose;
 LTC_status status;
-double temperature;
+double temperature[SLAVE_NUMBER];
 
 /* USER CODE END */
 
@@ -161,7 +161,7 @@ float minVolt;
         status = AE_ltcIsGpioOpenWire(&ltcBat, MODE_7KHZ, CELL_ALL);
 #endif
 
-#if 1   // read the cell voltage
+#if 0   // read the cell voltage
         AE_ltcStartCellAdc(ltcBat, MODE_7KHZ, true, CELL_ALL);
         //!< check adcMeasure duration is completed
         while(!AE_ltcAdcMeasureState());
@@ -211,33 +211,34 @@ float minVolt;
         AE_ltcContinuePwm(ltcBat);     // continue if pwm is paused
 #endif
 
-#if 1   // close the adc, LTC6812-1 has 3 clear ADC commands: CLRCELL, CLRAUX and CLRSTAT
+#if 0   // close the adc, LTC6812-1 has 3 clear ADC commands: CLRCELL, CLRAUX and CLRSTAT
         status = AE_ltcClearCellAdc(ltcBat);
         status = AE_ltcClearGpioAdc(ltcBat);
         status = AE_ltcClearStatusAdc(ltcBat);
 #endif
 
-#if 0   // read GPIO3 temperature
-        temperature = AE_ltcTemperature(&ltcBat);
+#if 0   // read GPIO3 temperature on development board
+        AE_ltcTemperature(ltcBat, SLAVE_NUMBER);
 #endif
 
-#if 0   // when under and over limits are exceeded for cellx, x.th flag is raise
-        AE_ltcSetUnderOverVoltage(&ltcBat, 3.7f, 4.2f);
+#if 1   // when under and over limits are exceeded for cellx, x.th flag is raise
+        AE_ltcSetUnderOverVoltage(ltcBat, 3.0f, 4.2f);
 
-        status = AE_ltcUnderOverFlag(&ltcBat);
+        status = AE_ltcUnderOverFlag(ltcBat);
 
-        if(ltcBat.statusRegB.CellOverFlag.cell1)
+        if(ltcBat[0].statusRegB.CellOverFlag.cell1)
         {
-            //cell 1 is overVoltage
+            int a = 10;
         }
         else
         {
             //cell 1 is less than limit
         }
 
-        if(ltcBat.statusRegB.CellUnderFlag.cell1)
+        if(ltcBat[0].statusRegB.CellUnderFlag.cell1)
         {
             //cell 1 in undervoltage
+            int a = 10;
         }
         else
         {
