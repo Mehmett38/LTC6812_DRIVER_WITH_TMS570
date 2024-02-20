@@ -161,7 +161,7 @@ float minVolt;
         status = AE_ltcIsGpioOpenWire(&ltcBat, MODE_7KHZ, CELL_ALL);
 #endif
 
-#if 0   // read the cell voltage
+#if 1   // read the cell voltage
         AE_ltcStartCellAdc(ltcBat, MODE_7KHZ, true, CELL_ALL);
         //!< check adcMeasure duration is completed
         while(!AE_ltcAdcMeasureState());
@@ -201,20 +201,20 @@ float minVolt;
         }
 #endif
 
-#if 1   //pwm duty setting after balance is open
-        AE_ltcStartPwm(ltcBat, S_PIN_1 | S_PIN_2| S_PIN_3, PWM_DUTY_LEVEL_8);
+#if 0   //pwm duty setting after balance is open
+        AE_ltcStartPwm(ltcBat, S_PIN_1 | S_PIN_2| S_PIN_3, PWM_DUTY_LEVEL_12);
         AE_ltcStartPwm(ltcBat, S_PIN_4 | S_PIN_5| S_PIN_6, PWM_DUTY_LEVEL_6);
 #endif
 
 #if 0   //pwm stop and continue commands
-        AE_ltcPausePwm(&ltcBat);        // pause the pwm
-        AE_ltcContinuePwm(&ltcBat);     // continue if pwm is paused
+        AE_ltcPausePwm(ltcBat);        // pause the pwm
+        AE_ltcContinuePwm(ltcBat);     // continue if pwm is paused
 #endif
 
-#if 0   // close the adc, LTC6812-1 has 3 clear ADC commands: CLRCELL, CLRAUX and CLRSTAT
-        status = AE_ltcClearCellAdc(&ltcBat);
-        status = AE_ltcClearGpioAdc(&ltcBat);
-        status = AE_ltcClearStatusAdc(&ltcBat);
+#if 1   // close the adc, LTC6812-1 has 3 clear ADC commands: CLRCELL, CLRAUX and CLRSTAT
+        status = AE_ltcClearCellAdc(ltcBat);
+        status = AE_ltcClearGpioAdc(ltcBat);
+        status = AE_ltcClearStatusAdc(ltcBat);
 #endif
 
 #if 0   // read GPIO3 temperature

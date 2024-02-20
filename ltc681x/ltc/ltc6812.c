@@ -660,22 +660,25 @@ LTC_status AE_ltcReadStatusRegB(Ltc682x * ltcBat)
  */
 LTC_status AE_ltcClearCellAdc(Ltc682x * ltcBat)
 {
-    Ltc682x ltcTemp;
     LTC_status status;
 
     AE_ltcCmdWrite(cmdCLRCELL_pu16);
 
-    status = AE_ltcReadCellVoltage(&ltcTemp);
+    status = AE_ltcReadCellVoltage(ltcBat);
     if(status == LTC_WRONG_CRC) return status;
 
-    if(ltcTemp.volt.cell1 > 6.5)                                    //!< if adc conversion is close read the pin 0xFF but this variable is
+    for(i = 0; i < slaveNumber; i++)
     {
-        memset((void*)&ltcBat->volt.cell1, 0, sizeof(CellVolt));    // float, so value > 6.5 condition is consistent
-
-        return LTC_OK;
+        if(ltcBat[i].volt.cell1 > 6.5f)                                    //!< if adc conversion is closed, read the pin 0xFF but this variable is
+        {                                                               // float, so value > 6.5 condition is consistent
+            memset((void*)&ltcBat[i].volt.cell1, 0, sizeof(CellVolt));
+        }
+        else
+            return LTC_WRONG_CRC;
     }
-    else
-        return LTC_WRONG_CRC;
+
+
+    return LTC_OK;
 }
 
 /**
@@ -692,13 +695,17 @@ LTC_status AE_ltcClearGpioAdc(Ltc682x * ltcBat)
     status = AE_ltcReadGpioVoltage(ltcBat);
     if(status == LTC_WRONG_CRC) return status;
 
-    if(ltcBat->gpio.gpio1 > 6.5)        //!< //!< if adc conversion is close read the pin 0xFF but this variable is
-    {                                   // float, so value > 6.5 condition is consistent
-        memset((void*)&ltcBat->gpio.gpio1, 0, sizeof(Gpio));
-        return LTC_OK;
+    for(i = 0; i < slaveNumber; i++)
+    {
+        if(ltcBat[i].gpio.gpio1 > 6.5f)        //!< //!< if adc conversion is close read the pin 0xFF but this variable is
+        {                                   // float, so value > 6.5 condition is consistent
+            memset((void*)&ltcBat[i].gpio.gpio1, 0, sizeof(Gpio));
+        }
+        else
+            return LTC_WRONG_CRC;
     }
-    else
-        return LTC_WRONG_CRC;
+
+    return LTC_OK;
 }
 
 /**
@@ -715,13 +722,20 @@ LTC_status AE_ltcClearStatusAdc(Ltc682x * ltcBat)
     status = AE_ltcReadStatusRegA(ltcBat);
     if(status == LTC_WRONG_CRC) return status;
 
-    if(ltcBat->gpio.gpio1 > 6.5)        //!< //!< if adc conversion is close read the pin 0xFF but this variable is
-    {                                   // float, so value > 6.5 condition is consistent
-        memset((void*)&ltcBat->statusRegA.sumOfCell, 0, sizeof(StatusRegA));
-        return LTC_OK;
+    for(i = 0; i < slaveNumber; i++)
+    {
+        for(i = 0; i < slaveNumber; i++)
+        {
+            if(ltcBat[i].statusRegA.analogPowerSupplyVolt > 6.5f)        //!< //!< if adc conversion is close read the pin 0xFF but this variable is
+            {                                   // float, so value > 6.5 condition is consistent
+                memset((void*)&ltcBat[i].statusRegA.sumOfCell, 0, sizeof(StatusRegA));
+            }
+            else
+                return LTC_WRONG_CRC;
+        }
     }
-    else
-        return LTC_WRONG_CRC;
+
+    return LTC_OK;
 }
 
 /**
@@ -733,24 +747,27 @@ LTC_status AE_ltcClearStatusAdc(Ltc682x * ltcBat)
  */
 void AE_ltcStartPwm(Ltc682x * ltcBat, uint16_t S_PIN_, uint8_t PWM_DUTY_LEVEL_)
 {
-    uint16_t pwmDuty[12] = {0};         /* pwm blocks valid on PWM Register Group and PWM/S Control Register Group B
-                                           so, send 12 bytes data*/
     uint8_t mode = 0;
     uint8_t index = 0;
+    uint8_t j;
 
-    for(i = 0; i < 15; i++)             //!< 15 == S pin number
+    for(j = 0; j < slaveNumber; j++)
     {
-        if((S_PIN_ >> i) & 0x01)
+        for(i = 0; i < 15; i++)             //!< 15 == S pin number
         {
-            index = i / 2;
-            mode = i % 2;
+            if((S_PIN_ >> i) & 0x01)
+            {
+                index = i / 2;
+                mode = i % 2;
 
-            pwmDuty[index] |= (PWM_DUTY_LEVEL_ << (mode * 4));
+                ltcBat[j].pwmDuty[index] &= ~(0xFF << (mode * 4));
+                ltcBat[j].pwmDuty[index] |= (PWM_DUTY_LEVEL_ << (mode * 4));
+            }
         }
     }
 
-    AE_ltcWrite(pwmDuty, cmdWRPWM_pu16);
-    AE_ltcWrite(&pwmDuty[6], cmdWRPSB_pu16);
+    AE_ltcWrite(&ltcBat[0].pwmDuty[0], cmdWRPWM_pu16);  // PWM1-12
+    AE_ltcWrite(&ltcBat[0].pwmDuty[6], cmdWRPSB_pu16);  // PWM13-15
 }
 
 /**
