@@ -64,7 +64,7 @@
 */
 
 /* USER CODE BEGIN (2) */
-#define SLAVE_NUMBER           (1)  //!< assign number of slave
+#define SLAVE_NUMBER           (2)  //!< assign number of slave
 
 Ltc682x ltcBat[SLAVE_NUMBER] = {0};
 
@@ -224,11 +224,10 @@ float minVolt;
 #endif
 
 #if 1   // when under and over limits are exceeded for cellx, x.th flag is raise
-        unverVoltage[0] = 3.9f;     // undervoltage value for slave 1
-        unverVoltage[1] = 3.8f;     // undervoltage value for slave 2
-        overVoltage[0] = 4.1f;      // overvoltage value for slave 1
+        unverVoltage[0] = 3.0f;     // undervoltage value for slave 1
+        overVoltage[0] = 3.1f;      // overvoltage value for slave 1
+        unverVoltage[1] = 3.2f;     // undervoltage value for slave 2
         overVoltage[1] = 4.2f;      // overvoltage value for slave 2
-
 
         AE_ltcSetUnderOverVoltage(ltcBat, unverVoltage, overVoltage);
 

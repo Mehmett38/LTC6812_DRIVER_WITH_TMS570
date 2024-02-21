@@ -13,7 +13,7 @@ static uint16_t rxBuffer[256];
 volatile uint32_t uwTick;
 spiBASE_t * ltcSpi_ps;                                                  // spi base address
 static uint8_t slaveNumber;                                             // bms total connection
-static uint16_t i;                                                      // counter
+static int16_t i;                                                       // counter
 static uint16_t dummy_u16 = 0xFF;                                       // dummy variable
 static LTC_status balanceStatus = LTC_BALANCE_COMPLETED;
 static spiDAT1_t spiDat_s =                                             // spi configuration parameters
@@ -72,26 +72,26 @@ void AE_ltcInit(spiBASE_t * spi, Ltc682x * ltcBat)
  */
 void AE_ltcWrite(uint16_t * txData, uint16_t cmd[4])
 {
-    uint8_t bufferLen = slaveNumber * (TRANSMIT_LEN + CMD_LEN);           // 4 = cmd, 8 = 6 byte data + 2 byte crc
+    uint8_t bufferLen = slaveNumber * TRANSMIT_LEN + CMD_LEN;           // 4 = cmd, 8 = 6 byte data + 2 byte crc
     uint8_t j;
     uint16_t pec;
 
+    for(j = 0; j < CMD_LEN; j++)                                    // assign command pec
+    {
+        txBuffer[j] = cmd[j];
+    }
+
     for(i = 0; i < slaveNumber; i++)
     {
-        for(j = 0; j < CMD_LEN; j++)                                    // assign command pec
-        {
-            txBuffer[j + i * (TRANSMIT_LEN + CMD_LEN)] = cmd[j];
-        }
-
         for(j = 0; j < REGISTER_LEN; j++)
         {   /*When the slaveNumber changes, slave offset must be added to the txData pointer
             to ensure that it is transferred to the other slave.*/
-            txBuffer[CMD_LEN + (CMD_LEN +TRANSMIT_LEN) * i + j] = txData[(i * sizeof(Ltc682x) / sizeof(uint16_t)) + j];
+            txBuffer[CMD_LEN + TRANSMIT_LEN * i + j] = txData[(i * sizeof(Ltc682x) / sizeof(uint16_t)) + j];
         }
 
         pec = AE_pec15((uint8_t*)& txData[(i * sizeof(Ltc682x) / sizeof(uint16_t))], 6);
-        txBuffer[CMD_LEN + (CMD_LEN +TRANSMIT_LEN) * i + 6] = (pec >> 8) & 0xFF;   // +6 = pec0 index
-        txBuffer[CMD_LEN + (CMD_LEN +TRANSMIT_LEN) * i + 7] = (pec >> 0) & 0xFF;   // +7 = pec1 index
+        txBuffer[CMD_LEN + TRANSMIT_LEN * i + 6] = (pec >> 8) & 0xFF;   // +6 = pec0 index
+        txBuffer[CMD_LEN + TRANSMIT_LEN * i + 7] = (pec >> 0) & 0xFF;   // +7 = pec1 index
     }
 
     AE_ltcWakeUpSleep();
@@ -328,17 +328,20 @@ LTC_status AE_ltcReadCellVoltage(Ltc682x * ltcBat)
  */
 void AE_ltcSetUnderOverVoltage(Ltc682x * ltcBat, float * underVolt, float * overVolt)
 {
+    float underVoltTemp;
+    float overVoltTemp;
+
     for(i = 0; i < slaveNumber; i++)
     {
         ltcBat[i].cfgAr.CFGAR0.REFON = 1;
     }
-
     AE_ltcWrite((uint16_t*)&ltcBat[0].cfgAr, cmdWRCFGA_pu16);
+    AE_ltcReadConfRegA(ltcBat);
 
-    for(i = 0; i < slaveNumber; i++)
+    for(i = (slaveNumber - 1); i >= 0; i--)
     {
-        underVolt[i] = underVolt[i] * 625.0 - 1;
-        overVolt[i] = overVolt[i] * 625;
+        underVoltTemp = underVolt[slaveNumber - i - 1] * 625.0 - 1;
+        overVoltTemp = overVolt[slaveNumber - i - 1] * 625;
 
         // clear voltage set register
         ltcBat[i].cfgAr.CFGAR1.cfg = 0;
@@ -348,14 +351,16 @@ void AE_ltcSetUnderOverVoltage(Ltc682x * ltcBat, float * underVolt, float * over
         // configure the voltage
         ltcBat[i].cfgAr.CFGAR0.REFON = 1;
 
-        ltcBat[i].cfgAr.CFGAR1.cfg |= (uint16_t)underVolt[i] & 0x00FF;
-        ltcBat[i].cfgAr.CFGAR2.cfg |= ((uint16_t)underVolt[i] >> 8) & 0x000F;
+        ltcBat[i].cfgAr.CFGAR1.cfg |= (uint16_t)underVoltTemp & 0x00FF;
+        ltcBat[i].cfgAr.CFGAR2.cfg |= ((uint16_t)underVoltTemp >> 8) & 0x000F;
 
-        ltcBat[i].cfgAr.CFGAR2.cfg |= ((uint16_t)overVolt[i] << 4) & 0x00F0;
-        ltcBat[i].cfgAr.CFGAR3.cfg |= ((uint16_t)overVolt[i] >> 4) & 0x00FF;
+        ltcBat[i].cfgAr.CFGAR2.cfg |= ((uint16_t)overVoltTemp << 4) & 0x00F0;
+        ltcBat[i].cfgAr.CFGAR3.cfg |= ((uint16_t)overVoltTemp >> 4) & 0x00FF;
 
-        AE_ltcWrite((uint16_t*)&ltcBat->cfgAr, cmdWRCFGA_pu16);
     }
+    AE_ltcWrite((uint16_t*)&ltcBat[0].cfgAr, cmdWRCFGA_pu16);
+
+    AE_ltcReadConfRegA(ltcBat);
 }
 
 LTC_status AE_ltcUnderOverFlag(Ltc682x * ltcBat)
@@ -854,7 +859,7 @@ void AE_ltcPreBalance(Ltc682x * ltcBat, DischargeTime DIS_, float underVolt, flo
     ltcBat->cfgBr.CFGBR1.cfg |= maskedDCC;
 
     //!< enable discharge monitoring and set under and over voltage
-    AE_ltcSetUnderOverVoltage(ltcBat, underVolt, overVolt);
+//    AE_ltcSetUnderOverVoltage(ltcBat, underVolt, overVolt);       //float pointer olarak yaz 20/02/2024
 
     AE_ltcWrite((uint16_t*)&ltcBat->cfgAr, cmdWRCFGA_pu16);
     AE_ltcWrite((uint16_t*)&ltcBat->cfgBr, cmdWRCFGB_pu16);
@@ -889,7 +894,7 @@ void AE_ltcBalance(Ltc682x * ltcBat, float minVoltage)
     AE_ltcWrite((uint16_t*)&ltcBat->cfgBr, cmdWRCFGB_pu16);
 
     // set the under and overvoltage limit
-    AE_ltcSetUnderOverVoltage(ltcBat, 3.0f, minVoltage);
+//    AE_ltcSetUnderOverVoltage(ltcBat, 3.0f, minVoltage);  // float pointer olarak yaz 20/02/2024
 
     // take the under and overvoltage flags
     AE_ltcUnderOverFlag(ltcBat);
