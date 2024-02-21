@@ -920,6 +920,8 @@ void AE_ltcBalance(Ltc682x * ltcBat, float *minCellVoltages, float * minBalanceV
         ltcBat[i].cfgBr.CFGBR0.cfg |= (maskedDCC >> 8) & 0xF0;
 
         ltcBat[i].cfgAr.CFGAR5.DCTO = 1;
+
+        ltcBat[i].balanceStatus = LTC_IN_BALANCE;
     }
 
     AE_ltcWrite((uint16_t*)&ltcBat->cfgAr, cmdWRCFGA_pu16);
@@ -934,32 +936,37 @@ LTC_status AE_ltcIsBalanceComplete(Ltc682x * ltcBat)
     LTC_status status;
     uint16_t dccVal = 0;
 
-    if(balanceStatus == LTC_IN_BALANCE)
+    status = AE_ltcRead((uint16_t*)&ltcBat[i].cfgAr.CFGAR0.cfg, cmdRDCFGA_pu16);
+    if(status == LTC_WRONG_CRC) return LTC_WRONG_CRC;
+    status = AE_ltcRead((uint16_t*)&ltcBat[i].cfgBr.CFGBR0.cfg, cmdRDCFGB_pu16);
+    if(status == LTC_WRONG_CRC) return LTC_WRONG_CRC;
+
+    for(i = 0; i < slaveNumber; i++)
     {
-        status = AE_ltcRead((uint16_t*)&ltcBat->cfgAr.CFGAR0.cfg, cmdRDCFGA_pu16);
-        status = AE_ltcRead((uint16_t*)&ltcBat->cfgBr.CFGBR0.cfg, cmdRDCFGB_pu16);
-
-        if(status == LTC_WRONG_CRC) return LTC_WRONG_CRC;
-
-        dccVal |= (ltcBat->cfgAr.CFGAR4.cfg & 0xFF) << 1;   // 1 - 0 (1 = DCCx's x, 0 = register start index)
-        dccVal |= (ltcBat->cfgAr.CFGAR5.cfg & 0x0F) << 9;   // 9 - 0
-        dccVal |= (ltcBat->cfgBr.CFGBR0.cfg & 0x70) << 9;   // 13 - 4 (look at datasheet 4 comes register start index)
-        dccVal |= (ltcBat->cfgBr.CFGBR1.cfg & 0x04) >> 2;   // 0 - 2
-
-        //when balance is completed dccVal will be 0 and
-        if(!dccVal)
+        if(ltcBat[i].balanceStatus == LTC_IN_BALANCE)
         {
-            return LTC_BALANCE_COMPLETED;
+            dccVal |= (ltcBat[i].cfgAr.CFGAR4.cfg & 0xFF) << 1;   // 1 - 0 (1 = DCCx's x, 0 = register start index)
+            dccVal |= (ltcBat[i].cfgAr.CFGAR5.cfg & 0x0F) << 9;   // 9 - 0
+            dccVal |= (ltcBat[i].cfgBr.CFGBR0.cfg & 0x70) << 9;   // 13 - 4 (look at datasheet 4 comes register start index)
+            dccVal |= (ltcBat[i].cfgBr.CFGBR1.cfg & 0x04) >> 2;   // 0 - 2
+
+            //when balance is completed dccVal will be 0 and
+            if(!dccVal)
+            {
+                ltcBat[i].balanceStatus = LTC_BALANCE_COMPLETED;
+            }
+            else
+            {
+                ltcBat[i].balanceStatus = LTC_IN_BALANCE;
+            }
         }
         else
         {
-            return LTC_IN_BALANCE;
+            ltcBat[i].balanceStatus = LTC_BALANCE_COMPLETED;
         }
     }
-    else
-    {
-        return LTC_BALANCE_COMPLETED;
-    }
+
+    return LTC_OK;
 }
 
 /**
@@ -1139,6 +1146,7 @@ LTC_status AE_ltcIsGpioOpenWire(Ltc682x * ltcBat, AdcMode adcMode, uint8_t CELL_
         AE_ltcStartGpioAdc(ltcBat, MODE_7KHZ, GPIO_ALL);
         while(!AE_ltcAdcMeasureState());
         status = AE_ltcReadGpioVoltage(ltcBat);
+        if(status == LTC_WRONG_CRC) return LTC_WRONG_CRC;
 
         gioPuPtr = (float*)&ltcBat[i].gpio.gpio1;
         for(j = 0; j < GPIO_NUMBER; j++)
@@ -1160,6 +1168,7 @@ LTC_status AE_ltcIsGpioOpenWire(Ltc682x * ltcBat, AdcMode adcMode, uint8_t CELL_
         AE_ltcStartGpioAdc(ltcBat, MODE_7KHZ, GPIO_ALL);
         while(!AE_ltcAdcMeasureState());
         status = AE_ltcReadGpioVoltage(ltcBat);
+        if(status == LTC_WRONG_CRC) return LTC_WRONG_CRC;
 
         gioPdPtr = (float*)&ltcBat[i].gpio.gpio1;
         for(j = 0; j < GPIO_NUMBER; j++)
@@ -1186,7 +1195,7 @@ LTC_status AE_ltcIsGpioOpenWire(Ltc682x * ltcBat, AdcMode adcMode, uint8_t CELL_
  * @param[in] bms global variable
  * @return temperature in celcius
  */
-void AE_ltcTemperature(Ltc682x * ltcBat, float * temperature)
+void AE_ltcTemperature(Ltc682x * ltcBat)
 {
     AE_ltcStartGpioAdc(ltcBat, MODE_7KHZ, GPIO_ALL);
     while(!AE_ltcAdcMeasureState());
@@ -1194,7 +1203,7 @@ void AE_ltcTemperature(Ltc682x * ltcBat, float * temperature)
 
     for(i = 0; i < slaveNumber; i++)
     {
-        temperature[i] = AE_calculateTemp(ltcBat[i].gpio.gpio3, ltcBat[i].gpio.ref, PULL_DOWN);
+        ltcBat[i].gio3Temperature = AE_calculateTemp(ltcBat[i].gpio.gpio3, ltcBat[i].gpio.ref, PULL_DOWN);
     }
 }
 

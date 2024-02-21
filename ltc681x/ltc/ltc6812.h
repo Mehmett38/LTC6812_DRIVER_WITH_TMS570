@@ -477,6 +477,8 @@ typedef struct{
     StatusRegA statusRegA;
     StatusRegB statusRegB;
     float minCellVolt;
+    LTC_status balanceStatus;
+    float gio3Temperature;               //GPIO3 temperature on development board;
     uint16_t pwmDuty[12];                /* ***Do not use this variable
                                          pwm blocks valid on PWM Register Group and PWM/S Control Register
                                          Group B so, send 12 bytes data*/
@@ -565,7 +567,7 @@ void AE_ltcMinCellVolt(Ltc682x * ltcBat);
 LTC_status AE_ltcIsCellOpenWire(Ltc682x * ltcBat, AdcMode adcMode, uint8_t CELL_, OpenWire *openWire);
 LTC_status AE_ltcIsGpioOpenWire(Ltc682x * ltcBat, AdcMode adcMode, uint8_t CELL_, OpenWire *openWire);
 
-void AE_ltcTemperature(Ltc682x * ltcBat, float * temperature);
+void AE_ltcTemperature(Ltc682x * ltcBat);
 
 static void AE_ltcTick(uint32_t );
 uint32_t getUsTick();

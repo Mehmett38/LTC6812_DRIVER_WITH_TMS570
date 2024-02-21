@@ -80,6 +80,7 @@ float overVoltage[SLAVE_NUMBER];
 float minCellVoltages[SLAVE_NUMBER];
 float minBalanceVoltages[SLAVE_NUMBER] = {2.8f, 2.8f};
 
+
 /* USER CODE END */
 
 int main(void)
@@ -114,8 +115,8 @@ int main(void)
 
    AE_ltcMinCellVolt(ltcBat);    //assign the minimum cell voltage to the ltcBat[x].minCellVoltage variable
 
-   minCellVoltages[0] = ltcBat[0].minCellVolt + 0.009f;
-   minCellVoltages[1] = ltcBat[1].minCellVolt + 0.003f;
+   minCellVoltages[0] = ltcBat[0].minCellVolt;
+   minCellVoltages[1] = ltcBat[1].minCellVolt;
 #endif
 
 
@@ -125,11 +126,15 @@ int main(void)
 
         AE_ltcBalance(ltcBat, minCellVoltages, minBalanceVoltages);
 #endif
-//<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<-LTC V2.0->>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-#if 0
-        AE_ltcSetUnderOverVoltage(ltcBat, min, 4.2f);
+
+#if 0   //check the balance is completed or note
         status = AE_ltcIsBalanceComplete(ltcBat);
-        if(status == LTC_BALANCE_COMPLETED)
+        if(ltcBat[0].balanceStatus == LTC_BALANCE_COMPLETED)
+        {
+            int a = 10;
+            UNUSED(a);
+        }
+        else if(ltcBat[1].balanceStatus == LTC_BALANCE_COMPLETED)
         {
             int a = 10;
             UNUSED(a);
@@ -215,7 +220,7 @@ int main(void)
 #endif
 
 #if 0   // read GPIO3 temperature on development board
-        AE_ltcTemperature(ltcBat, SLAVE_NUMBER);
+        AE_ltcTemperature(ltcBat);
 #endif
 
 #if 0   // when under and over limits are exceeded for cellx, x.th flag is raise
