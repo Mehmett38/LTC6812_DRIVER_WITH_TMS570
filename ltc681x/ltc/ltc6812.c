@@ -81,17 +81,17 @@ void AE_ltcWrite(uint16_t * txData, uint16_t cmd[4])
         txBuffer[j] = cmd[j];
     }
 
-    for(i = 0; i < slaveNumber; i++)
+    for(i = (slaveNumber - 1); i >= 0; i--)
     {
         for(j = 0; j < REGISTER_LEN; j++)
         {   /*When the slaveNumber changes, slave offset must be added to the txData pointer
             to ensure that it is transferred to the other slave.*/
-            txBuffer[CMD_LEN + TRANSMIT_LEN * i + j] = txData[(i * sizeof(Ltc682x) / sizeof(uint16_t)) + j];
+            txBuffer[CMD_LEN + TRANSMIT_LEN * (slaveNumber - i - 1) + j] = txData[(i * sizeof(Ltc682x) / sizeof(uint16_t)) + j];
         }
 
         pec = AE_pec15((uint8_t*)& txData[(i * sizeof(Ltc682x) / sizeof(uint16_t))], 6);
-        txBuffer[CMD_LEN + TRANSMIT_LEN * i + 6] = (pec >> 8) & 0xFF;   // +6 = pec0 index
-        txBuffer[CMD_LEN + TRANSMIT_LEN * i + 7] = (pec >> 0) & 0xFF;   // +7 = pec1 index
+        txBuffer[CMD_LEN + TRANSMIT_LEN * (slaveNumber - i - 1) + 6] = (pec >> 8) & 0xFF;   // +6 = pec0 index
+        txBuffer[CMD_LEN + TRANSMIT_LEN * (slaveNumber - i - 1) + 7] = (pec >> 0) & 0xFF;   // +7 = pec1 index
     }
 
     AE_ltcWakeUpSleep();
@@ -336,12 +336,11 @@ void AE_ltcSetUnderOverVoltage(Ltc682x * ltcBat, float * underVolt, float * over
         ltcBat[i].cfgAr.CFGAR0.REFON = 1;
     }
     AE_ltcWrite((uint16_t*)&ltcBat[0].cfgAr, cmdWRCFGA_pu16);
-    AE_ltcReadConfRegA(ltcBat);
 
-    for(i = (slaveNumber - 1); i >= 0; i--)
+    for(i = 0; i < slaveNumber; i++)
     {
-        underVoltTemp = underVolt[slaveNumber - i - 1] * 625.0 - 1;
-        overVoltTemp = overVolt[slaveNumber - i - 1] * 625;
+        underVoltTemp = underVolt[i] * 625.0 - 1;
+        overVoltTemp = overVolt[i] * 625;
 
         // clear voltage set register
         ltcBat[i].cfgAr.CFGAR1.cfg = 0;
@@ -356,8 +355,8 @@ void AE_ltcSetUnderOverVoltage(Ltc682x * ltcBat, float * underVolt, float * over
 
         ltcBat[i].cfgAr.CFGAR2.cfg |= ((uint16_t)overVoltTemp << 4) & 0x00F0;
         ltcBat[i].cfgAr.CFGAR3.cfg |= ((uint16_t)overVoltTemp >> 4) & 0x00FF;
-
     }
+
     AE_ltcWrite((uint16_t*)&ltcBat[0].cfgAr, cmdWRCFGA_pu16);
 
     AE_ltcReadConfRegA(ltcBat);

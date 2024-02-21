@@ -223,10 +223,10 @@ float minVolt;
         AE_ltcTemperature(ltcBat, SLAVE_NUMBER);
 #endif
 
-#if 1   // when under and over limits are exceeded for cellx, x.th flag is raise
+#if 0   // when under and over limits are exceeded for cellx, x.th flag is raise
         unverVoltage[0] = 3.0f;     // undervoltage value for slave 1
-        overVoltage[0] = 3.1f;      // overvoltage value for slave 1
-        unverVoltage[1] = 3.2f;     // undervoltage value for slave 2
+        overVoltage[0] = 4.1f;      // overvoltage value for slave 1
+        unverVoltage[1] = 3.0f;     // undervoltage value for slave 2
         overVoltage[1] = 4.2f;      // overvoltage value for slave 2
 
         AE_ltcSetUnderOverVoltage(ltcBat, unverVoltage, overVoltage);
