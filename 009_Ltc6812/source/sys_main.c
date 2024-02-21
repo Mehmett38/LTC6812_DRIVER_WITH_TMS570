@@ -64,7 +64,7 @@
 */
 
 /* USER CODE BEGIN (2) */
-#define SLAVE_NUMBER           (1)  //!< assign number of slave
+#define SLAVE_NUMBER           (2)  //!< assign number of slave
 
 Ltc682x ltcBat[SLAVE_NUMBER] = {0};
 
@@ -85,40 +85,9 @@ float minBalanceVoltages[SLAVE_NUMBER] = {2.8f, 2.8f};
 int main(void)
 {
 /* USER CODE BEGIN (3) */
-    ltcInit(spiREG1);
+    ltcInit(spiREG3);
 
     gioInit();
-
-
-#if 0       // code testing V1.0    working successfully
-    uint16_t isoTxData[12];
-    uint16_t isoRxData[8] = {0};
-    uint16_t eceTx;
-
-    uint16_t isoData[6] = {0x7C, 0x77, 0x44, 0x22, 0x11, 0x55};
-
-    eceTx = AE_pec15((uint8_t*)isoData, 6);
-
-    isoTxData[0] = cmdWRCFGA_pu16[0];
-    isoTxData[1] = cmdWRCFGA_pu16[1];
-    isoTxData[2] = cmdWRCFGA_pu16[2];
-    isoTxData[3] = cmdWRCFGA_pu16[3];
-    isoTxData[4] = isoData[0];
-    isoTxData[5] = isoData[1];
-    isoTxData[6] = isoData[2];
-    isoTxData[7] = isoData[3];
-    isoTxData[8] = isoData[4];
-    isoTxData[9] = isoData[5];
-    isoTxData[10] = (eceTx >> 8) & 0xFF;
-    isoTxData[11] = (eceTx >> 0) & 0xFF;
-    spiDAT1_t spiDat_s =            // spi configuration parameters
-    {
-         .CSNR = 0,
-         .CS_HOLD = 1,
-         .DFSEL = SPI_FMT_0,
-         .WDEL = 0
-    };
-#endif
 
 
 #if 0    // read the lowest cell voltage and balance the other cell up to this level
@@ -137,7 +106,7 @@ int main(void)
     AE_ltcStartPwm(ltcBat, S_PIN_ALL, PWM_DUTY_LEVEL_10);
 #endif
 
-#if 0   // balance in polling mode              @refgroup balance
+#if 1   // balance in polling mode              @refgroup balance
     AE_ltcStartCellAdc(ltcBat, MODE_7KHZ, false, CELL_ALL);
     //!< check adcMeasure duration is completed
     while(!AE_ltcAdcMeasureState());
@@ -152,7 +121,7 @@ int main(void)
 
     while(1)
     {
-#if 0   //balance in polling    before this function call @refgroup balance section to take min cell voltages
+#if 1   //balance in polling    before this function call @refgroup balance section to take min cell voltages
 
         AE_ltcBalance(ltcBat, minCellVoltages, minBalanceVoltages);
 #endif
@@ -167,7 +136,7 @@ int main(void)
         }
 #endif
 
-#if 1   // open wire check !AE_ltcIsCellOpenWire TESTED AE_ltcIsGpioOpenWire NOT TESTED
+#if 0   // open wire check !AE_ltcIsCellOpenWire TESTED AE_ltcIsGpioOpenWire NOT TESTED
         OpenWire openWire;
 
         status = AE_ltcIsCellOpenWire(ltcBat, MODE_7KHZ, CELL_ALL, &openWire);
@@ -271,69 +240,6 @@ int main(void)
 
 #endif
 
-        //<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<BEFORE WORKING LTC V1.0>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-
-        #if 0   // code testing V1.1    working successfully
-
-        AE_ltcWakeUpSleep();
-
-        AE_LTC_CS_ON();
-
-        spiTransmitData(spiREG1, &spiDat_s, 12, isoTxData);
-
-        AE_LTC_CS_OFF();
-
-        AE_delayTenUs(1);   //!< 10us delay
-
-        AE_ltcWakeUpIdle();
-        AE_delayTenUs(1);   //!< 10us delay
-
-
-        AE_LTC_CS_ON();
-
-//        spiTransmitAndReceiveData(spiREG1, &__spiDat_s, 12, cmdRDCFGA_pu16, isoRxData);
-
-        spiTransmitData(spiREG1, &spiDat_s, 4, cmdRDCFGA_pu16);
-        spiReceiveData(spiREG1, &spiDat_s, 8, isoRxData);
-
-        AE_LTC_CS_OFF();
-
-        AE_delayMs(10000);
-        #endif
-
-        #if 0   // code testing V1.0
-
-        //!< configuration A setting
-        AE_ltcWriteConfiguration(&cellInf);
-
-        #endif
-
-        #if 0   //!< ltc6820 data transfer
-
-        AE_LTC_CS_ON();
-
-        spiTransmitData(spiREG1, &spiDat_s, 4, txDat);
-
-        AE_LTC_CS_OFF();
-
-        #endif
-
-        #if 0
-
-            AE_ltcWakeUpSleep();
-            LTC_status ltcStatus = AE_ltcRDCFG(&cellInf, RDCFGA);
-
-        #endif
-
-        #if 0      // timing test
-
-        gioSetBit(gioPORTA, 2, 1);
-        AE_delayMs(10);
-        gioSetBit(gioPORTA, 2, 0);
-        AE_delayMs(10);
-
-        #endif
-
         AE_delayMs(4500);   //must bigger than 2000
 
         if(status == LTC_OK);                   //!< close the status warning
@@ -360,7 +266,7 @@ void ltcInit(spiBASE_t * spiReg)
         ltcBat[i].batConf.gioAPullOffPin = GPIO_5 | GPIO_4 | GPIO_3;   // selected pin's pull down off
         ltcBat[i].batConf.gioBPullOffPin = GPIO_8 | GPIO_7 | GPIO_6;   // selected pin's pull down off
 
-        ltcBat[i].batConf.numberOfCell = 12;                     //!< cell number in a slave can assign difference cell with array
+        ltcBat[i].batConf.numberOfCell = 13;                     //!< cell number in a slave can assign difference cell with array
         ltcBat[i].batConf.numberOfSlave = SLAVE_NUMBER;          // number of slave
     }
 
