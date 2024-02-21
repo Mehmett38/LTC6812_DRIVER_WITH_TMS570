@@ -33,6 +33,9 @@
 #define REGISTER_LEN                    (6)
 #define TRANSMIT_LEN                    (8)
 #define RECEIVE_LEN                     (8)
+#define CELL_NUMBER                     (15)
+#define GPIO_NUMBER                     (9)
+#define OPEN_WIRE_VOLTAGE               (-0.150f)   //in datasheet write -0.400 but that value is not supply the open wire situation
 
 #define CFGARO_GPIO1                    (3)         //index of GPIO1 parameter in register CFGRA0
 
@@ -128,8 +131,8 @@
 #define PWM_DUTY_LEVEL_0                (0)     //!< %0
 #define PWM_DUTY_LEVEL_1                (1)     //!< %6.7
 #define PWM_DUTY_LEVEL_2                (2)     //!< %13.3
-#define PWM_DUTY_LEVEL_3                (3)     //!< ...
-#define PWM_DUTY_LEVEL_4                (4)
+#define PWM_DUTY_LEVEL_3                (3)     //!< %19.0
+#define PWM_DUTY_LEVEL_4                (4)     //!< ...
 #define PWM_DUTY_LEVEL_5                (5)
 #define PWM_DUTY_LEVEL_6                (6)
 #define PWM_DUTY_LEVEL_7                (7)
@@ -206,6 +209,13 @@ typedef enum{
 }AdcMode;
 
 //<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<-STRUCTURES->>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+typedef struct
+{
+    uint8_t slaveNumber;
+    uint8_t cellNumber;
+    uint8_t gioNumber;
+}OpenWire;
+
 typedef struct{
     union{
         uint16_t cfg;
@@ -352,7 +362,7 @@ typedef struct{
 }CFGBR;
 
 typedef struct{
-    uint8_t numberOfSerialCell;     // cell number in a slave
+    uint8_t numberOfCell;     // cell number in a slave
     uint8_t numberOfSlave;          // slave number
     bool adcopt;                    // using to configure system ADC read speed
     bool refon;                     // to understand better investigate the core working diagram
@@ -466,6 +476,7 @@ typedef struct{
     Gpio gpio;
     StatusRegA statusRegA;
     StatusRegB statusRegB;
+    float minCellVolt;
     uint16_t pwmDuty[12];                /* ***Do not use this variable
                                          pwm blocks valid on PWM Register Group and PWM/S Control Register
                                          Group B so, send 12 bytes data*/
@@ -546,13 +557,13 @@ void AE_ltcStartPwm(Ltc682x * ltcBat, uint16_t S_PIN_, uint8_t PWM_DUTY_LEVEL_);
 void AE_ltcPausePwm(Ltc682x * ltcBat);
 void AE_ltcContinuePwm(Ltc682x * ltcBat);
 
-void AE_ltcPreBalance(Ltc682x * ltcBat, DischargeTime DIS_, float underVolt, float overVolt, uint16_t DCC_);
-void AE_ltcBalance(Ltc682x * ltcBat, float minVoltage);
+void AE_ltcPreBalance(Ltc682x * ltcBat, DischargeTime DIS_, float * underVolt, float * overVolt, uint16_t DCC_);
+void AE_ltcBalance(Ltc682x * ltcBat, float *minCellVoltages, float * minBalanceVoltages);
 LTC_status AE_ltcIsBalanceComplete(Ltc682x * ltcBat);
-float AE_ltcMinCellVolt(Ltc682x * ltcBat);
+void AE_ltcMinCellVolt(Ltc682x * ltcBat);
 
-LTC_status AE_ltcIsCellOpenWire(Ltc682x * ltcBat, AdcMode adcMode, uint8_t CELL_);
-LTC_status AE_ltcIsGpioOpenWire(Ltc682x * ltcBat, AdcMode adcMode, uint8_t CELL_);
+LTC_status AE_ltcIsCellOpenWire(Ltc682x * ltcBat, AdcMode adcMode, uint8_t CELL_, OpenWire *openWire);
+LTC_status AE_ltcIsGpioOpenWire(Ltc682x * ltcBat, AdcMode adcMode, uint8_t CELL_, OpenWire *openWire);
 
 void AE_ltcTemperature(Ltc682x * ltcBat, float * temperature);
 

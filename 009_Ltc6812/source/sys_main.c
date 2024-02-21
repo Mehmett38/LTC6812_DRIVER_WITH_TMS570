@@ -64,7 +64,7 @@
 */
 
 /* USER CODE BEGIN (2) */
-#define SLAVE_NUMBER           (2)  //!< assign number of slave
+#define SLAVE_NUMBER           (1)  //!< assign number of slave
 
 Ltc682x ltcBat[SLAVE_NUMBER] = {0};
 
@@ -77,13 +77,15 @@ LTC_status status;
 double temperature[SLAVE_NUMBER];
 float unverVoltage[SLAVE_NUMBER];
 float overVoltage[SLAVE_NUMBER];
+float minCellVoltages[SLAVE_NUMBER];
+float minBalanceVoltages[SLAVE_NUMBER] = {2.8f, 2.8f};
 
 /* USER CODE END */
 
 int main(void)
 {
 /* USER CODE BEGIN (3) */
-    ltcInit(spiREG3);
+    ltcInit(spiREG1);
 
     gioInit();
 
@@ -119,33 +121,40 @@ int main(void)
 #endif
 
 
-float minVolt;
-
 #if 0    // read the lowest cell voltage and balance the other cell up to this level
-    AE_ltcStartCellAdc(&ltcBat, MODE_7KHZ, false, CELL_ALL);
+    AE_ltcStartCellAdc(ltcBat, MODE_7KHZ, false, CELL_ALL);
     //!< check adcMeasure duration is completed
     while(!AE_ltcAdcMeasureState());
-    status = AE_ltcReadCellVoltage(&ltcBat);
+    status = AE_ltcReadCellVoltage(ltcBat);
 
-    minVolt = AE_ltcMinCellVolt(&ltcBat);    //error ratio
-    AE_ltcPreBalance(&ltcBat, DIS_5_MIN, minVolt, 4.2, DCC_ALL);
-    AE_ltcStartPwm(&ltcBat, S_PIN_ALL, PWM_DUTY_LEVEL_14);
+    AE_ltcMinCellVolt(ltcBat);
+    unverVoltage[0] = ltcBat[0].minCellVolt;
+    unverVoltage[1] = ltcBat[1].minCellVolt;
+    overVoltage[0] = 4.2f;
+    overVoltage[1] = 4.2f;
+
+    AE_ltcPreBalance(ltcBat, DIS_5_MIN, unverVoltage, overVoltage, DCC_ALL);
+    AE_ltcStartPwm(ltcBat, S_PIN_ALL, PWM_DUTY_LEVEL_10);
 #endif
 
-#if 0   // balance in polling mode
-    AE_ltcStartCellAdc(&ltcBat, MODE_7KHZ, false, CELL_ALL);
+#if 0   // balance in polling mode              @refgroup balance
+    AE_ltcStartCellAdc(ltcBat, MODE_7KHZ, false, CELL_ALL);
     //!< check adcMeasure duration is completed
     while(!AE_ltcAdcMeasureState());
-    status = AE_ltcReadCellVoltage(&ltcBat);
+    status = AE_ltcReadCellVoltage(ltcBat);
 
-    minVolt = AE_ltcMinCellVolt(&ltcBat);    //error ratio
+   AE_ltcMinCellVolt(ltcBat);    //assign the minimum cell voltage to the ltcBat[x].minCellVoltage variable
+
+   minCellVoltages[0] = ltcBat[0].minCellVolt + 0.009f;
+   minCellVoltages[1] = ltcBat[1].minCellVolt + 0.003f;
 #endif
 
 
     while(1)
     {
-#if 0   //balance in polling
-        AE_ltcBalance(&ltcBat, minVolt);
+#if 0   //balance in polling    before this function call @refgroup balance section to take min cell voltages
+
+        AE_ltcBalance(ltcBat, minCellVoltages, minBalanceVoltages);
 #endif
 //<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<-LTC V2.0->>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 #if 0
@@ -158,9 +167,26 @@ float minVolt;
         }
 #endif
 
-#if 0   // open wire check !NOT TESTED
-        status = AE_ltcIsCellOpenWire(&ltcBat, MODE_7KHZ, CELL_ALL);
-        status = AE_ltcIsGpioOpenWire(&ltcBat, MODE_7KHZ, CELL_ALL);
+#if 1   // open wire check !AE_ltcIsCellOpenWire TESTED AE_ltcIsGpioOpenWire NOT TESTED
+        OpenWire openWire;
+
+        status = AE_ltcIsCellOpenWire(ltcBat, MODE_7KHZ, CELL_ALL, &openWire);
+        if(status == LTC_OPEN_WIRE)
+        {
+            uint8_t openWireSlave = openWire.slaveNumber;
+            uint8_t openCellNumber = openWire.cellNumber;
+            UNUSED(openWireSlave);
+            UNUSED(openCellNumber);
+        }
+
+        status = AE_ltcIsGpioOpenWire(ltcBat, MODE_7KHZ, CELL_ALL, &openWire);
+        if(status == LTC_OPEN_WIRE)
+        {
+            uint8_t openWireSlave = openWire.slaveNumber;
+            uint8_t openGioNumber = openWire.gioNumber;
+            UNUSED(openWireSlave);
+            UNUSED(openGioNumber);
+        }
 #endif
 
 #if 0   // read the cell voltage
@@ -227,7 +253,7 @@ float minVolt;
         unverVoltage[0] = 3.0f;     // undervoltage value for slave 1
         overVoltage[0] = 4.1f;      // overvoltage value for slave 1
         unverVoltage[1] = 3.0f;     // undervoltage value for slave 2
-        overVoltage[1] = 4.2f;      // overvoltage value for slave 2
+        overVoltage[1] = 3.2f;      // overvoltage value for slave 2
 
         AE_ltcSetUnderOverVoltage(ltcBat, unverVoltage, overVoltage);
 
@@ -308,7 +334,7 @@ float minVolt;
 
         #endif
 
-        AE_delayMs(4500);
+        AE_delayMs(4500);   //must bigger than 2000
 
         if(status == LTC_OK);                   //!< close the status warning
         if(returnVarningClose == 10)    break;  //!< close return 0 warning
@@ -334,8 +360,8 @@ void ltcInit(spiBASE_t * spiReg)
         ltcBat[i].batConf.gioAPullOffPin = GPIO_5 | GPIO_4 | GPIO_3;   // selected pin's pull down off
         ltcBat[i].batConf.gioBPullOffPin = GPIO_8 | GPIO_7 | GPIO_6;   // selected pin's pull down off
 
-        ltcBat[i].batConf.numberOfSerialCell = 13;                     // cell number in a slave
-        ltcBat[i].batConf.numberOfSlave = SLAVE_NUMBER;                // number of slave
+        ltcBat[i].batConf.numberOfCell = 12;                     //!< cell number in a slave can assign difference cell with array
+        ltcBat[i].batConf.numberOfSlave = SLAVE_NUMBER;          // number of slave
     }
 
     AE_ltcInit(spiReg, ltcBat);

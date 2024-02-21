@@ -358,8 +358,6 @@ void AE_ltcSetUnderOverVoltage(Ltc682x * ltcBat, float * underVolt, float * over
     }
 
     AE_ltcWrite((uint16_t*)&ltcBat[0].cfgAr, cmdWRCFGA_pu16);
-
-    AE_ltcReadConfRegA(ltcBat);
 }
 
 LTC_status AE_ltcUnderOverFlag(Ltc682x * ltcBat)
@@ -387,14 +385,17 @@ LTC_status AE_ltcUnderOverFlag(Ltc682x * ltcBat)
     status = AE_ltcRead(rxBuffer, cmdRDAUXD_pu16);
     if(status == LTC_WRONG_CRC) return LTC_WRONG_CRC;
 
-    //assign flags that come from auxilary groupd flags to status register B structure
-    ltcBat[0].statusRegB.CellUnderFlag.cell13 = (rxBuffer[4] >> 0) & 0x01;
-    ltcBat[0].statusRegB.CellUnderFlag.cell14 = (rxBuffer[4] >> 2) & 0x01;
-    ltcBat[0].statusRegB.CellUnderFlag.cell15 = (rxBuffer[4] >> 4) & 0x01;
+    for(i = 0; i < slaveNumber; i++)
+    {
+        //assign flags that come from auxilary groupd flags to status register B structure
+        ltcBat[i].statusRegB.CellUnderFlag.cell13 = (rxBuffer[4 + i * RECEIVE_LEN] >> 0) & 0x01;
+        ltcBat[i].statusRegB.CellUnderFlag.cell14 = (rxBuffer[4 + i * RECEIVE_LEN] >> 2) & 0x01;
+        ltcBat[i].statusRegB.CellUnderFlag.cell15 = (rxBuffer[4 + i * RECEIVE_LEN] >> 4) & 0x01;
 
-    ltcBat[0].statusRegB.CellOverFlag.cell13 = (rxBuffer[4] >> 1) & 0x01;
-    ltcBat[0].statusRegB.CellOverFlag.cell14 = (rxBuffer[4] >> 3) & 0x01;
-    ltcBat[0].statusRegB.CellOverFlag.cell15 = (rxBuffer[4] >> 5) & 0x01;
+        ltcBat[i].statusRegB.CellOverFlag.cell13 = (rxBuffer[4 + i * RECEIVE_LEN] >> 1) & 0x01;
+        ltcBat[i].statusRegB.CellOverFlag.cell14 = (rxBuffer[4 + i * RECEIVE_LEN] >> 3) & 0x01;
+        ltcBat[i].statusRegB.CellOverFlag.cell15 = (rxBuffer[4 + i * RECEIVE_LEN] >> 5) & 0x01;
+    }
 
     return LTC_OK;
 }
@@ -662,7 +663,6 @@ LTC_status AE_ltcReadStatusRegB(Ltc682x * ltcBat)
         ltcBat[i].statusRegB.CellUnderFlag.cell12 = ((fRxPtr[4] >> 6 ) & 0x01);
         ltcBat[i].statusRegB.CellOverFlag.cell12  = ((fRxPtr[4] >> 7 ) & 0x01);
 
-
         ltcBat[i].statusRegB.thsd = fRxPtr[5] & 0x01;
         ltcBat[i].statusRegB.muxFail = (fRxPtr[5] >> 1) & 0x01;
 
@@ -818,48 +818,53 @@ void AE_ltcContinuePwm(Ltc682x * ltcBat)
  * @param[in] pin that want to balance, for parameter search @refgroup dcc
  * @return none
  */
-void AE_ltcPreBalance(Ltc682x * ltcBat, DischargeTime DIS_, float underVolt, float overVolt, uint16_t DCC_)
+void AE_ltcPreBalance(Ltc682x * ltcBat, DischargeTime DIS_, float * underVolt, float * overVolt, uint16_t DCC_)
 {
     uint16_t maskedDCC;
 
-    ltcBat->cfgBr.CFGBR1.DTMEN |= 1;            //The LTC6812-1 has the ability to periodically monitor
-                                                //cell voltages while the discharge timer is active. The host
-                                                //should write the DTMEN bit in Configuration Register
-                                                //Group B to 1 to enable this feature.
+    for(i = 0; i < slaveNumber; i++)
+    {
+        ltcBat[i].cfgBr.CFGBR1.DTMEN |= 1;          //The LTC6812-1 has the ability to periodically monitor
+                                                    //cell voltages while the discharge timer is active. The host
+                                                    //should write the DTMEN bit in Configuration Register
+                                                    //Group B to 1 to enable this feature.
 
-    // clear related bits
-    ltcBat->cfgAr.CFGAR4.cfg &= 0x00;
-    ltcBat->cfgAr.CFGAR5.cfg &= 0x00;
-    ltcBat->cfgBr.CFGBR0.cfg &= 0x8F;
-    ltcBat->cfgBr.CFGBR1.cfg &= 0xFB;
+        // clear related bits
+        ltcBat[i].cfgAr.CFGAR4.cfg &= 0x00;
+        ltcBat[i].cfgAr.CFGAR5.cfg &= 0x00;
+        ltcBat[i].cfgBr.CFGBR0.cfg &= 0x8F;
+        ltcBat[i].cfgBr.CFGBR1.cfg &= 0xFB;
 
-    //DCC pins are scattered in several registers so we must mask them
-    //Register Group A, CFGRA4 Mask = pin1-8    0x1FE
-    maskedDCC = DCC_ & 0x1FE;
-    maskedDCC >>= 1;           //pin1 start index 1 and dcc1 located 0th index in register
-    ltcBat->cfgAr.CFGAR4.cfg |= maskedDCC;
+        DCC_ &= ~(0xFFFF << (ltcBat[i].batConf.numberOfCell + 1));  //+1 comes from index shifting
 
-    //Register Group A, CFGRA5 Mask = pin9-12    0x1E00
-    maskedDCC = DCC_ & 0x1E00;
-    maskedDCC >>= 9;            //pin9 start index 9 and dcc9 located 0th index in register
-    ltcBat->cfgAr.CFGAR5.cfg |= maskedDCC;
+        //DCC pins are scattered in several registers so we must mask them
+        //Register Group A, CFGRA4 Mask = pin1-8    0x1FE
+        maskedDCC = DCC_ & 0x1FE;
+        maskedDCC >>= 1;           //pin1 start index 1 and dcc1 located 0th index in register
+        ltcBat[i].cfgAr.CFGAR4.cfg |= maskedDCC;
 
-    //set discharge duration
-    ltcBat->cfgAr.CFGAR5.cfg |= (DIS_ << 4) & 0x00F0;
+        //Register Group A, CFGRA5 Mask = pin9-12    0x1E00
+        maskedDCC = DCC_ & 0x1E00;
+        maskedDCC >>= 9;            //pin9 start index 9 and dcc9 located 0th index in register
+        ltcBat[i].cfgAr.CFGAR5.cfg |= maskedDCC;
 
-    //Register Group B, CFGBR0 Mask = pin13-15    0xE000
-    maskedDCC = DCC_ & 0xE000;
-    maskedDCC >>= 9;            //pin13 start index 13 and dcc13 located 4th index in register (13 - 4)
-    ltcBat->cfgBr.CFGBR0.cfg |= maskedDCC;
+        //set discharge duration
+        ltcBat[i].cfgAr.CFGAR5.cfg |= (DIS_ << 4) & 0x00F0;
 
-    //Register Group B, CFGBR1 Mask = pin0    0xE000
-    maskedDCC = DCC_ & 0x1;
-    maskedDCC <<= 2;            //pin0 start index 0 and dcc0 located 2th index in register (0 - 2)
-    ltcBat->cfgBr.CFGBR1.cfg |= maskedDCC;
+        //Register Group B, CFGBR0 Mask = pin13-15    0xE000
+        maskedDCC = DCC_ & 0xE000;
+        maskedDCC >>= 9;            //pin13 start index 13 and dcc13 located 4th index in register (13 - 4)
+        ltcBat[i].cfgBr.CFGBR0.cfg |= maskedDCC;
 
-    //!< enable discharge monitoring and set under and over voltage
-//    AE_ltcSetUnderOverVoltage(ltcBat, underVolt, overVolt);       //float pointer olarak yaz 20/02/2024
+        //Register Group B, CFGBR1 Mask = pin0    0xE000
+        maskedDCC = DCC_ & 0x1;
+        maskedDCC <<= 2;            //pin0 start index 0 and dcc0 located 2th index in register (0 - 2)
+        ltcBat[i].cfgBr.CFGBR1.cfg |= maskedDCC;
 
+        //!< enable discharge monitoring and set under and over voltage
+    }
+
+    AE_ltcSetUnderOverVoltage(ltcBat, underVolt, overVolt);       //float pointer olarak yaz 20/02/2024
     AE_ltcWrite((uint16_t*)&ltcBat->cfgAr, cmdWRCFGA_pu16);
     AE_ltcWrite((uint16_t*)&ltcBat->cfgBr, cmdWRCFGB_pu16);
 
@@ -870,47 +875,52 @@ void AE_ltcPreBalance(Ltc682x * ltcBat, DischargeTime DIS_, float underVolt, flo
  * @brief balance the cell in polling mode by checking the under and overvoltage flags
  * @param[in] bms global variable
  * @param[in] slave's min cell voltage
+ * @param[in] cell minimum discharge voltages
  * @return none
  */
-void AE_ltcBalance(Ltc682x * ltcBat, float minVoltage)
+void AE_ltcBalance(Ltc682x * ltcBat, float *minCellVoltages, float * minBalanceVoltages)
 {
     uint16_t maskedDCC;
 
-    minVoltage += 0.003f;       //!< adc error optimization
+    for(i = 0; i < slaveNumber; i++)
+    {
+        //clear the configuration register-A
+        memset((void*)&ltcBat[i].cfgAr.CFGAR0.cfg, 0, sizeof(CFGAR));
 
-    //clear the configuration register-A
-    memset((void*)&ltcBat->cfgAr.CFGAR0.cfg, 0, sizeof(CFGAR));
+        //enable REFON bit
+        ltcBat[i].cfgAr.CFGAR0.REFON = 1;
 
-    //enable REFON bit
-    ltcBat->cfgAr.CFGAR0.REFON |= 1;
+        //clear the DCC13-15, DCC0 and discharge timer enable
+        ltcBat[i].cfgBr.CFGBR0.cfg &= 0x8F;
+        ltcBat[i].cfgBr.CFGBR1.DTMEN = 0;
+        ltcBat[i].cfgBr.CFGBR1.DCC0 = 0;
+    }
 
-    //clear the DCC13-15, DCC0 and discharge timer enable
-    ltcBat->cfgBr.CFGBR0.cfg &= 0x8F;
-    ltcBat->cfgBr.CFGBR1.DTMEN = 0;
-    ltcBat->cfgBr.CFGBR1.DCC0 = 0;
-
-    AE_ltcWrite((uint16_t*)&ltcBat->cfgAr, cmdWRCFGA_pu16);
-    AE_ltcWrite((uint16_t*)&ltcBat->cfgBr, cmdWRCFGB_pu16);
+    AE_ltcWrite((uint16_t*)&ltcBat[0].cfgAr, cmdWRCFGA_pu16);
+    AE_ltcWrite((uint16_t*)&ltcBat[0].cfgBr, cmdWRCFGB_pu16);
 
     // set the under and overvoltage limit
-//    AE_ltcSetUnderOverVoltage(ltcBat, 3.0f, minVoltage);  // float pointer olarak yaz 20/02/2024
+    AE_ltcSetUnderOverVoltage(ltcBat, minBalanceVoltages, minCellVoltages);
 
     // take the under and overvoltage flags
     AE_ltcUnderOverFlag(ltcBat);
 
-    maskedDCC = ltcBat->statusRegB.CellOverFlag.flag;
+    for(i = 0; i < slaveNumber; i++)
+    {
+        maskedDCC = ltcBat[i].statusRegB.CellOverFlag.flag & ~(0xFFFF << ltcBat[i].batConf.numberOfCell);
 
-    //<<<<<<<<<<<<<<<-Over Voltage->>>>>>>>>>>>>>>
-    //DCC pins are scattered in several registers so we must mask them
-    ltcBat->cfgAr.CFGAR4.cfg |= maskedDCC & 0xFF;
+        //<<<<<<<<<<<<<<<-Over Voltage->>>>>>>>>>>>>>>
+        //DCC pins are scattered in several registers so we must mask them
+        ltcBat[i].cfgAr.CFGAR4.cfg |= maskedDCC & 0xFF;
 
-    //Register Group A, CFGRA5 Mask = pin9-12    0x1E00
-    ltcBat->cfgAr.CFGAR5.cfg |= (maskedDCC >> 8) & 0x0F;
+        //Register Group A, CFGRA5 Mask = pin9-12    0x1E00
+        ltcBat[i].cfgAr.CFGAR5.cfg |= (maskedDCC >> 8) & 0x0F;
 
-    //Register Group B, CFGBR0 Mask = pin13-15    0xE000
-    ltcBat->cfgBr.CFGBR0.cfg |= (maskedDCC >> 8) & 0xF0;
+        //Register Group B, CFGBR0 Mask = pin13-15    0xE000
+        ltcBat[i].cfgBr.CFGBR0.cfg |= (maskedDCC >> 8) & 0xF0;
 
-    ltcBat->cfgAr.CFGAR5.DCTO = 1;
+        ltcBat[i].cfgAr.CFGAR5.DCTO = 1;
+    }
 
     AE_ltcWrite((uint16_t*)&ltcBat->cfgAr, cmdWRCFGA_pu16);
     AE_ltcWrite((uint16_t*)&ltcBat->cfgBr, cmdWRCFGB_pu16);
@@ -957,19 +967,25 @@ LTC_status AE_ltcIsBalanceComplete(Ltc682x * ltcBat)
  * @param[in] bms global variable
  * @return minimum cell voltage
  */
-float AE_ltcMinCellVolt(Ltc682x * ltcBat)
+void AE_ltcMinCellVolt(Ltc682x * ltcBat)
 {
-    float *fptr = (float *)&ltcBat->volt.cell1;
+    float *fptr = NULL;
     float min;
-    min = fptr[0];
+    uint8_t j;
 
-    for(i = 1; i < 15; i++)
+    for(i = 0; i < slaveNumber; i++)
     {
-        if(fptr[i] < min)
-            min = fptr[i];
-    }
+        fptr = (float *)&ltcBat[i].volt.cell1;
+        min = fptr[0];
 
-    return min;
+        for(j = 1; j < ltcBat[i].batConf.numberOfCell; j++)
+        {
+            if(fptr[j] < min)
+                min = fptr[j];
+        }
+
+        ltcBat[i].minCellVolt = min;
+    }
 }
 
 /**
@@ -979,13 +995,15 @@ float AE_ltcMinCellVolt(Ltc682x * ltcBat)
  * @param[in] checked cell selection, for parameter search @refgroup CH
  * @return if no error return OK else OPEN_WIRE
  */
-LTC_status AE_ltcIsCellOpenWire(Ltc682x * ltcBat, AdcMode adcMode, uint8_t CELL_)
+LTC_status AE_ltcIsCellOpenWire(Ltc682x * ltcBat, AdcMode adcMode, uint8_t CELL_, OpenWire *openWire)
 {
-    Ltc682x bmsTest1;
-    Ltc682x bmsTest2;
     LTC_status status;
-    float * cellPu;
-    float * cellPd;
+    float* cellPuPtr;
+    float* cellPdPtr;
+    float cellPu[CELL_NUMBER];
+    float cellPd[CELL_NUMBER];
+    uint8_t i;  // i is change inside of loop because i is declared global so some function change it so defined again
+    uint8_t j;
 
     uint16_t adow= 0x0228;    //!< adow base register
     uint16_t cmd[4];
@@ -993,56 +1011,80 @@ LTC_status AE_ltcIsCellOpenWire(Ltc682x * ltcBat, AdcMode adcMode, uint8_t CELL_
 
     if(adcMode & 0x10)
     {
-        if(!ltcBat->cfgAr.CFGAR0.ADCOPT)
+        for(i = 0; i < slaveNumber; i++)
         {
-            ltcBat->cfgAr.CFGAR0.ADCOPT = 1;
-            AE_ltcWrite((uint16_t*)&ltcBat->cfgAr.CFGAR0, cmdWRCFGA_pu16);
+            if(!ltcBat[i].cfgAr.CFGAR0.ADCOPT)
+            {
+                ltcBat[i].cfgAr.CFGAR0.ADCOPT = 1;
+            }
         }
+        AE_ltcWrite((uint16_t*)&ltcBat[0].cfgAr, cmdWRCFGA_pu16);
     }
 
-    adow |= (1 << 6);       // 6.th index, PUL = 1 command register index
-    adow |= (adcMode & 0x0F) << 7;
-    adow |= CELL_;
+    for(i = 0; i < slaveNumber; i++)
+    {
+        adow |= (1 << 6);       // 6.th index, PUL = 1 command register index
+        adow |= (adcMode & 0x0F) << 7;
+        adow |= CELL_;
 
-    cmd[0] = (adow & 0xFF00) >> 8;
-    cmd[1] = (adow & 0x00FF) >> 0;
+        cmd[0] = (adow & 0xFF00) >> 8;
+        cmd[1] = (adow & 0x00FF) >> 0;
 
-    pec = AE_pec15((uint8_t*)cmd, 2);
-    cmd[2] = (pec & 0xFF00) >> 8;
-    cmd[3] = (pec & 0x00FF) >> 0;
+        pec = AE_pec15((uint8_t*)cmd, 2);
+        cmd[2] = (pec & 0xFF00) >> 8;
+        cmd[3] = (pec & 0x00FF) >> 0;
 
-    AE_ltcClearCellAdc(ltcBat);
+        AE_ltcClearCellAdc(ltcBat);
 
-    AE_ltcCmdRead(cmd);
-    AE_ltcCmdRead(cmd);
+        AE_ltcCmdWrite(cmd);
+        AE_ltcCmdWrite(cmd);
 
+        AE_ltcStartCellAdc(ltcBat, MODE_7KHZ, true, CELL_ALL);
+        //!< check adcMeasure duration is completed
+        while(!AE_ltcAdcMeasureState());
+        status = AE_ltcReadCellVoltage(ltcBat);
+        if(status == LTC_WRONG_CRC) return LTC_WRONG_CRC;
 
-    while(!AE_ltcAdcMeasureState());
-    status = AE_ltcReadCellVoltage(&bmsTest1);
-    if(status == LTC_WRONG_CRC) return LTC_WRONG_CRC;
-    cellPu = (float*)&bmsTest1.volt.cell1;
+        cellPuPtr = (float*)&ltcBat[i].volt.cell1;
+        for(j = 0; j < CELL_NUMBER; j++)
+        {
+            cellPu[j] = cellPuPtr[j];
+        }
 
-    adow &= ~(1 << 6);       // 6.th index, PUL = 0 command register index
-    cmd[0] = (adow & 0xFF00) >> 8;
-    cmd[1] = (adow & 0x00FF) >> 0;
+        adow &= ~(1 << 6);       // 6.th index, PUL = 0 command register index
+        cmd[0] = (adow & 0xFF00) >> 8;
+        cmd[1] = (adow & 0x00FF) >> 0;
 
-    pec = AE_pec15((uint8_t*)cmd, 2);
-    cmd[2] = (pec & 0xFF00) >> 8;
-    cmd[3] = (pec & 0x00FF) >> 0;
+        pec = AE_pec15((uint8_t*)cmd, 2);
+        cmd[2] = (pec & 0xFF00) >> 8;
+        cmd[3] = (pec & 0x00FF) >> 0;
 
-    AE_ltcClearCellAdc(ltcBat);
+        AE_ltcClearCellAdc(ltcBat);
 
-    AE_ltcCmdRead(cmd);
-    AE_ltcCmdRead(cmd);
+        AE_ltcCmdWrite(cmd);
+        AE_ltcCmdWrite(cmd);
 
-    while(!AE_ltcAdcMeasureState());
-    status = AE_ltcReadCellVoltage(&bmsTest2);
-    if(status == LTC_WRONG_CRC) return LTC_WRONG_CRC;
-    cellPd = (float*)&bmsTest2.volt.cell1;
+        AE_ltcStartCellAdc(ltcBat, MODE_7KHZ, true, CELL_ALL);
+        //!< check adcMeasure duration is completed
+        while(!AE_ltcAdcMeasureState());
+        status = AE_ltcReadCellVoltage(ltcBat);
+        if(status == LTC_WRONG_CRC) return LTC_WRONG_CRC;
 
-    for(i = 1; i < ltcBat->batConf.numberOfSerialCell; i++) //cell 2-15
-    {   // -0.100 comes from data sheet
-        if((cellPu[i] - cellPd[i]) < -0.100)    return LTC_OPEN_WIRE;
+        cellPdPtr = (float *)&ltcBat[i].volt.cell1;
+        for(j = 0; j < CELL_NUMBER; j++)
+        {
+            cellPd[j] = cellPdPtr[j];
+        }
+
+        for(j = 0; j < ltcBat[i].batConf.numberOfCell; j++)
+        {
+            if((cellPu[j] - cellPd[j]) < OPEN_WIRE_VOLTAGE)
+            {
+                openWire->slaveNumber = i + 1;
+                openWire->cellNumber = j + 1;
+                return LTC_OPEN_WIRE;
+            }
+        }
     }
 
     return LTC_OK;
@@ -1055,13 +1097,15 @@ LTC_status AE_ltcIsCellOpenWire(Ltc682x * ltcBat, AdcMode adcMode, uint8_t CELL_
  * @param[in] checked cell selection, for parameter search @refgroup CH
  * @return if no error return OK else OPEN_WIRE
  */
-LTC_status AE_ltcIsGpioOpenWire(Ltc682x * ltcBat, AdcMode adcMode, uint8_t CELL_)
+LTC_status AE_ltcIsGpioOpenWire(Ltc682x * ltcBat, AdcMode adcMode, uint8_t CELL_, OpenWire *openWire)
 {
-    Ltc682x bmsTest1;
-    Ltc682x bmsTest2;
     LTC_status status;
-    float * gioPU;
-    float * gioPd;
+    float* gioPuPtr;
+    float* gioPdPtr;
+    float gioPu[GPIO_NUMBER];
+    float gioPd[GPIO_NUMBER];
+    uint8_t i = 0;
+    uint8_t j = 0;
 
     uint16_t axow= 0x0410;    //!< axow base register
     uint16_t cmd[4];
@@ -1076,52 +1120,62 @@ LTC_status AE_ltcIsGpioOpenWire(Ltc682x * ltcBat, AdcMode adcMode, uint8_t CELL_
         }
     }
 
-    axow |= (1 << 6);       // 6.th index, PUL = 1 command register index
-    axow |= (adcMode & 0x0F) << 7;
-    axow |= CELL_;
-
-    cmd[0] = (axow & 0xFF00) >> 8;
-    cmd[1] = (axow & 0x00FF) >> 0;
-
-    pec = AE_pec15((uint8_t*)cmd, 2);
-    cmd[2] = (pec & 0xFF00) >> 8;
-    cmd[3] = (pec & 0x00FF) >> 0;
-
-    AE_ltcWakeUpSleep();
-
-    AE_LTC_CS_ON();
-
-    spiTransmitData(ltcSpi_ps, &spiDat_s, 4, cmd);
-
-    AE_LTC_CS_OFF();
-
-    while(!AE_ltcAdcMeasureState());
-    status = AE_ltcReadCellVoltage(&bmsTest1);
-    if(status == LTC_WRONG_CRC) return LTC_WRONG_CRC;
-    gioPU = (float*)&bmsTest1.gpio.gpio1;
-
-    axow &= ~(1 << 6);       // 6.th index, PUL = 0 command register index
-    cmd[0] = (axow & 0xFF00) >> 8;
-    cmd[1] = (axow & 0x00FF) >> 0;
-
-    pec = AE_pec15((uint8_t*)cmd, 2);
-    cmd[2] = (pec & 0xFF00) >> 8;
-    cmd[3] = (pec & 0x00FF) >> 0;
-
-    AE_LTC_CS_ON();
-
-    spiTransmitData(ltcSpi_ps, &spiDat_s, 4, cmd);
-
-    AE_LTC_CS_OFF();
-
-    while(!AE_ltcAdcMeasureState());
-    status = AE_ltcReadCellVoltage(&bmsTest2);
-    if(status == LTC_WRONG_CRC) return LTC_WRONG_CRC;
-    gioPd = (float*)&bmsTest2.gpio.gpio1;
-
-    for(i = 1; i < 9; i++) //gio 1-9
+    for(i = 0; i < slaveNumber; i++)
     {
-        if((gioPU[i] - gioPd[i]) < -0.100)    return LTC_OPEN_WIRE;
+        axow |= (1 << 6);       // 6.th index, PUL = 1 command register index
+        axow |= (adcMode & 0x0F) << 7;
+        axow |= CELL_;
+
+        cmd[0] = (axow & 0xFF00) >> 8;
+        cmd[1] = (axow & 0x00FF) >> 0;
+
+        pec = AE_pec15((uint8_t*)cmd, 2);
+        cmd[2] = (pec & 0xFF00) >> 8;
+        cmd[3] = (pec & 0x00FF) >> 0;
+
+        AE_ltcCmdWrite(cmd);
+        AE_ltcCmdWrite(cmd);
+
+        AE_ltcStartGpioAdc(ltcBat, MODE_7KHZ, GPIO_ALL);
+        while(!AE_ltcAdcMeasureState());
+        status = AE_ltcReadGpioVoltage(ltcBat);
+
+        gioPuPtr = (float*)&ltcBat[i].gpio.gpio1;
+        for(j = 0; j < GPIO_NUMBER; j++)
+        {
+            gioPu[j] = gioPuPtr[j];
+        }
+
+        axow &= ~(1 << 6);       // 6.th index, PUL = 0 command register index
+        cmd[0] = (axow & 0xFF00) >> 8;
+        cmd[1] = (axow & 0x00FF) >> 0;
+
+        pec = AE_pec15((uint8_t*)cmd, 2);
+        cmd[2] = (pec & 0xFF00) >> 8;
+        cmd[3] = (pec & 0x00FF) >> 0;
+
+        AE_ltcCmdWrite(cmd);
+        AE_ltcCmdWrite(cmd);
+
+        AE_ltcStartGpioAdc(ltcBat, MODE_7KHZ, GPIO_ALL);
+        while(!AE_ltcAdcMeasureState());
+        status = AE_ltcReadGpioVoltage(ltcBat);
+
+        gioPdPtr = (float*)&ltcBat[i].gpio.gpio1;
+        for(j = 0; j < GPIO_NUMBER; j++)
+        {
+            gioPd[j] = gioPdPtr[j];
+        }
+
+        for(i = 1; j < GPIO_NUMBER; j++) //gio 1-9
+        {   //-0.400f comes from datasheet
+            if((gioPu[j] - gioPd[j]) < OPEN_WIRE_VOLTAGE)
+            {
+                openWire->slaveNumber = i;
+                openWire->gioNumber = j;
+                return LTC_OPEN_WIRE;
+            }
+        }
     }
 
     return LTC_OK;
