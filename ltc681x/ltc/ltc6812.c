@@ -15,7 +15,6 @@ spiBASE_t * ltcSpi_ps;                                                  // spi b
 static uint8_t slaveNumber;                                             // bms total connection
 static int16_t i;                                                       // counter
 static uint16_t dummy_u16 = 0xFF;                                       // dummy variable
-static LTC_status balanceStatus = LTC_BALANCE_COMPLETED;
 static spiDAT1_t spiDat_s =                                             // spi configuration parameters
 {
      .CSNR = 0,
@@ -862,13 +861,15 @@ void AE_ltcPreBalance(Ltc682x * ltcBat, DischargeTime DIS_, float * underVolt, f
         ltcBat[i].cfgBr.CFGBR1.cfg |= maskedDCC;
 
         //!< enable discharge monitoring and set under and over voltage
+
+        ltcBat[i].balanceStatus = LTC_IN_BALANCE;
     }
 
     AE_ltcSetUnderOverVoltage(ltcBat, underVolt, overVolt);       //float pointer olarak yaz 20/02/2024
     AE_ltcWrite((uint16_t*)&ltcBat->cfgAr, cmdWRCFGA_pu16);
     AE_ltcWrite((uint16_t*)&ltcBat->cfgBr, cmdWRCFGB_pu16);
 
-    balanceStatus = LTC_IN_BALANCE;
+
 }
 
 /**

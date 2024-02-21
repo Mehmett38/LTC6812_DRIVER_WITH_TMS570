@@ -75,7 +75,7 @@ uint8_t toggle = 1;
 uint8_t returnVarningClose;
 LTC_status status;
 double temperature[SLAVE_NUMBER];
-float unverVoltage[SLAVE_NUMBER];
+float underVoltage[SLAVE_NUMBER];
 float overVoltage[SLAVE_NUMBER];
 float minCellVoltages[SLAVE_NUMBER];
 float minBalanceVoltages[SLAVE_NUMBER] = {2.8f, 2.8f};
@@ -98,12 +98,12 @@ int main(void)
     status = AE_ltcReadCellVoltage(ltcBat);
 
     AE_ltcMinCellVolt(ltcBat);
-    unverVoltage[0] = ltcBat[0].minCellVolt;
-    unverVoltage[1] = ltcBat[1].minCellVolt;
+    underVoltage[0] = ltcBat[0].minCellVolt;
+    underVoltage[1] = ltcBat[1].minCellVolt;
     overVoltage[0] = 4.2f;
     overVoltage[1] = 4.2f;
 
-    AE_ltcPreBalance(ltcBat, DIS_5_MIN, unverVoltage, overVoltage, DCC_ALL);
+    AE_ltcPreBalance(ltcBat, DIS_5_MIN, underVoltage, overVoltage, DCC_ALL);
     AE_ltcStartPwm(ltcBat, S_PIN_ALL, PWM_DUTY_LEVEL_10);
 #endif
 
@@ -224,12 +224,12 @@ int main(void)
 #endif
 
 #if 0   // when under and over limits are exceeded for cellx, x.th flag is raise
-        unverVoltage[0] = 3.0f;     // undervoltage value for slave 1
+        underVoltage[0] = 3.0f;     // undervoltage value for slave 1
         overVoltage[0] = 4.1f;      // overvoltage value for slave 1
-        unverVoltage[1] = 3.0f;     // undervoltage value for slave 2
+        underVoltage[1] = 3.0f;     // undervoltage value for slave 2
         overVoltage[1] = 3.2f;      // overvoltage value for slave 2
 
-        AE_ltcSetUnderOverVoltage(ltcBat, unverVoltage, overVoltage);
+        AE_ltcSetUnderOverVoltage(ltcBat, underVoltage, overVoltage);
 
         status = AE_ltcUnderOverFlag(ltcBat);
 
@@ -272,7 +272,7 @@ void ltcInit(spiBASE_t * spiReg)
         ltcBat[i].batConf.gioBPullOffPin = GPIO_8 | GPIO_7 | GPIO_6;   // selected pin's pull down off
 
         ltcBat[i].batConf.numberOfCell = 13;                     //!< cell number in a slave can assign difference cell with array
-        ltcBat[i].batConf.numberOfSlave = SLAVE_NUMBER;          // number of slave
+        ltcBat[i].batConf.numberOfSlave = SLAVE_NUMBER;          //!< number of slave
     }
 
     AE_ltcInit(spiReg, ltcBat);
