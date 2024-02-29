@@ -563,6 +563,7 @@ void AE_ltcPreBalance(Ltc682x * ltcBat, DischargeTime DIS_, float * underVolt, f
 void AE_ltcBalance(Ltc682x * ltcBat, float *minCellVoltages, float * minBalanceVoltages);
 LTC_status AE_ltcIsBalanceComplete(Ltc682x * ltcBat);
 void AE_ltcMinCellVolt(Ltc682x * ltcBat);
+float AE_ltcBatteryMinCellVolt(Ltc682x * ltcBat);
 
 LTC_status AE_ltcIsCellOpenWire(Ltc682x * ltcBat, AdcMode adcMode, uint8_t CELL_, OpenWire *openWire);
 LTC_status AE_ltcIsGpioOpenWire(Ltc682x * ltcBat, AdcMode adcMode, uint8_t CELL_, OpenWire *openWire);

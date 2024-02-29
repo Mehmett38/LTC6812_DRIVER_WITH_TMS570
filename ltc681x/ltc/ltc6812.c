@@ -868,8 +868,6 @@ void AE_ltcPreBalance(Ltc682x * ltcBat, DischargeTime DIS_, float * underVolt, f
     AE_ltcSetUnderOverVoltage(ltcBat, underVolt, overVolt);       //float pointer olarak yaz 20/02/2024
     AE_ltcWrite((uint16_t*)&ltcBat->cfgAr, cmdWRCFGA_pu16);
     AE_ltcWrite((uint16_t*)&ltcBat->cfgBr, cmdWRCFGB_pu16);
-
-
 }
 
 /**
@@ -895,6 +893,7 @@ void AE_ltcBalance(Ltc682x * ltcBat, float *minCellVoltages, float * minBalanceV
         ltcBat[i].cfgBr.CFGBR0.cfg &= 0x8F;
         ltcBat[i].cfgBr.CFGBR1.DTMEN = 0;
         ltcBat[i].cfgBr.CFGBR1.DCC0 = 0;
+        minCellVoltages[i] += 0.001;                //!< error offset
     }
 
     AE_ltcWrite((uint16_t*)&ltcBat[0].cfgAr, cmdWRCFGA_pu16);
@@ -994,6 +993,26 @@ void AE_ltcMinCellVolt(Ltc682x * ltcBat)
 
         ltcBat[i].minCellVolt = min;
     }
+}
+
+/**
+ * @brief return the minimum cell voltage
+ * @param[in] bms global variable
+ * @return minimum cell voltage in the all slave
+ */
+float AE_ltcBatteryMinCellVolt(Ltc682x * ltcBat)
+{
+    float min;
+
+    min = ltcBat[0].minCellVolt;
+
+    for(i = 1; i < slaveNumber; i++)
+    {
+        if(ltcBat[i].minCellVolt < min)
+            min = ltcBat[i].minCellVolt;
+    }
+
+    return min;
 }
 
 /**

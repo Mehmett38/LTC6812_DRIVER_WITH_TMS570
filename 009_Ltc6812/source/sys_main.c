@@ -64,7 +64,7 @@
 */
 
 /* USER CODE BEGIN (2) */
-#define SLAVE_NUMBER           (2)  //!< assign number of slave
+#define SLAVE_NUMBER           (1)  //!< assign number of slave
 
 Ltc682x ltcBat[SLAVE_NUMBER] = {0};
 
@@ -86,7 +86,7 @@ float minBalanceVoltages[SLAVE_NUMBER] = {2.8f, 2.8f};
 int main(void)
 {
 /* USER CODE BEGIN (3) */
-    ltcInit(spiREG3);
+    ltcInit(spiREG1);
 
     gioInit();
 
@@ -115,8 +115,10 @@ int main(void)
 
    AE_ltcMinCellVolt(ltcBat);    //assign the minimum cell voltage to the ltcBat[x].minCellVoltage variable
 
-   minCellVoltages[0] = ltcBat[0].minCellVolt;
-   minCellVoltages[1] = ltcBat[1].minCellVolt;
+   float systemMinVoltage = AE_ltcBatteryMinCellVolt(ltcBat);
+
+   minCellVoltages[0] = systemMinVoltage;
+   minCellVoltages[1] = systemMinVoltage;
 #endif
 
 
@@ -127,7 +129,7 @@ int main(void)
         AE_ltcBalance(ltcBat, minCellVoltages, minBalanceVoltages);
 #endif
 
-#if 0   //check the balance is completed or note
+#if 1   //check the balance is completed or note
         status = AE_ltcIsBalanceComplete(ltcBat);
         if(ltcBat[0].balanceStatus == LTC_BALANCE_COMPLETED)
         {
@@ -242,7 +244,6 @@ int main(void)
         {
             //cell1 under the underVoltage limit
         }
-
 #endif
 
         AE_delayMs(4500);   //must bigger than 2000
@@ -271,7 +272,7 @@ void ltcInit(spiBASE_t * spiReg)
         ltcBat[i].batConf.gioAPullOffPin = GPIO_5 | GPIO_4 | GPIO_3;   // selected pin's pull down off
         ltcBat[i].batConf.gioBPullOffPin = GPIO_8 | GPIO_7 | GPIO_6;   // selected pin's pull down off
 
-        ltcBat[i].batConf.numberOfCell = 13;                     //!< cell number in a slave can assign difference cell with array
+        ltcBat[i].batConf.numberOfCell = 12;                     //!< cell number in a slave can assign difference cell with array
         ltcBat[i].batConf.numberOfSlave = SLAVE_NUMBER;          //!< number of slave
     }
 
