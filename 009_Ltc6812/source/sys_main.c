@@ -73,6 +73,7 @@ void ltcInit(spiBASE_t * spiReg);
 #define UNUSED(x)   ((void)x)
 uint8_t toggle = 1;
 uint8_t returnVarningClose;
+uint8_t balanceFlag = 1;
 LTC_status status;
 double temperature[SLAVE_NUMBER];
 float underVoltage[SLAVE_NUMBER];
@@ -107,7 +108,7 @@ int main(void)
     AE_ltcStartPwm(ltcBat, S_PIN_ALL, PWM_DUTY_LEVEL_10);
 #endif
 
-#if 1   // balance in polling mode              @refgroup balance
+#if 1   // balance in polling mode
     AE_ltcStartCellAdc(ltcBat, MODE_7KHZ, false, CELL_ALL);
     //!< check adcMeasure duration is completed
     while(!AE_ltcAdcMeasureState());
@@ -118,31 +119,70 @@ int main(void)
    float systemMinVoltage = AE_ltcBatteryMinCellVolt(ltcBat);
 
    minCellVoltages[0] = systemMinVoltage;
-   minCellVoltages[1] = systemMinVoltage + 1;
-   minCellVoltages[2] = systemMinVoltage + 1;
-   minCellVoltages[3] = systemMinVoltage + 1;
-   minCellVoltages[4] = systemMinVoltage + 1;
-   minCellVoltages[5] = systemMinVoltage + 1;
-   minCellVoltages[6] = systemMinVoltage + 1;
+   minCellVoltages[1] = systemMinVoltage;
+   minCellVoltages[2] = systemMinVoltage;
+   minCellVoltages[3] = systemMinVoltage;
+   minCellVoltages[4] = systemMinVoltage;
+   minCellVoltages[5] = systemMinVoltage;
+   minCellVoltages[6] = systemMinVoltage;
 #endif
 
     while(1)
     {
 #if 1   //balance in polling    before this function call @refgroup balance section to take min cell voltages
 
-        AE_ltcBalance(ltcBat, minCellVoltages, minBalanceVoltages);
+        if(balanceFlag)
+        {
+            AE_ltcBalance(ltcBat, minCellVoltages, minBalanceVoltages);
+            AE_delayMs(3000);
+            AE_balanceStop(ltcBat);
+        }
+
 #endif
+
+        if(AE_ltcIsSystemInBalance())
+        {
+            //!< if all cell is balanced return true
+            //!< in this funciton systemBalanceState must be reset
+            AE_ltcResetSystemBalance();
+            balanceFlag = 0;
+        }
 
 #if 1   //check the balance is completed or note
         status = AE_ltcIsBalanceComplete(ltcBat);
         if(ltcBat[0].balanceStatus == LTC_BALANCE_COMPLETED)
         {
-            int a = 10;
+            int a = 10; //!< added for breakpoint
             UNUSED(a);
         }
-        else if(ltcBat[1].balanceStatus == LTC_BALANCE_COMPLETED)
+        if(ltcBat[1].balanceStatus == LTC_BALANCE_COMPLETED)
         {
-            int a = 10;
+            int a = 10; //!< added for breakpoint
+            UNUSED(a);
+        }
+        if(ltcBat[2].balanceStatus == LTC_BALANCE_COMPLETED)
+        {
+            int a = 10; //!< added for breakpoint
+            UNUSED(a);
+        }
+        if(ltcBat[3].balanceStatus == LTC_BALANCE_COMPLETED)
+        {
+            int a = 10; //!< added for breakpoint
+            UNUSED(a);
+        }
+        if(ltcBat[4].balanceStatus == LTC_BALANCE_COMPLETED)
+        {
+            int a = 10; //!< added for breakpoint
+            UNUSED(a);
+        }
+        if(ltcBat[5].balanceStatus == LTC_BALANCE_COMPLETED)
+        {
+            int a = 10; //!< added for breakpoint
+            UNUSED(a);
+        }
+        if(ltcBat[6].balanceStatus == LTC_BALANCE_COMPLETED)
+        {
+            int a = 10; //!< added for breakpoint
             UNUSED(a);
         }
 #endif
@@ -196,7 +236,7 @@ int main(void)
         status = AE_ltcReadStatusRegB(ltcBat);
 #endif
 
-#if 0   //internal die temperature
+#if 1   //internal die temperature
         AE_ltcStartStatusAdc(ltcBat, MODE_7KHZ, CHST_ALL);
         while(!AE_ltcAdcMeasureState());
         AE_ltcReadStatusRegA(ltcBat);
@@ -250,7 +290,7 @@ int main(void)
         }
 #endif
 
-        AE_delayMs(4500);   //must bigger than 2000
+        AE_delayMs(1000);   //must bigger than 2000
 
         if(status == LTC_OK);                   //!< close the status warning
         if(returnVarningClose == 10)    break;  //!< close return 0 warning

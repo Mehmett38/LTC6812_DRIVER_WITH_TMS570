@@ -15,6 +15,7 @@ spiBASE_t * ltcSpi_ps;                                                  // spi b
 static uint8_t slaveNumber;                                             // bms total connection
 static int16_t i;                                                       // counter
 static uint16_t dummy_u16 = 0xFF;                                       // dummy variable
+static bool allBatteryBalanceStatus;
 static spiDAT1_t spiDat_s =                                             // spi configuration parameters
 {
      .CSNR = 0,
@@ -46,6 +47,7 @@ void AE_ltcInit(spiBASE_t * spi, Ltc682x * ltcBat)
 
     for(i = 0; i < slaveNumber; i++)
     {
+        ltcBat[i].balanceCellBits = 0xFFFF;
         memset(&ltcBat[i].cfgAr, 0, sizeof(CFGAR));
         memset(&ltcBat[i].cfgBr, 0, sizeof(CFGBR));
 
@@ -905,7 +907,6 @@ void AE_ltcPreBalance(Ltc682x * ltcBat, DischargeTime DIS_, float * underVolt, f
                                                     //cell voltages while the discharge timer is active. The host
                                                     //should write the DTMEN bit in Configuration Register
                                                     //Group B to 1 to enable this feature.
-
         // clear related bits
         ltcBat[i].cfgAr.CFGAR4.cfg &= 0x00;
         ltcBat[i].cfgAr.CFGAR5.cfg &= 0x00;
@@ -971,7 +972,7 @@ void AE_ltcBalance(Ltc682x * ltcBat, float *minCellVoltages, float * minBalanceV
         ltcBat[i].cfgBr.CFGBR0.cfg &= 0x8F;
         ltcBat[i].cfgBr.CFGBR1.DTMEN = 0;
         ltcBat[i].cfgBr.CFGBR1.DCC0 = 0;
-//        minCellVoltages[i] += 0.005;                //!< error offset
+//        minCellVoltages[i] += 0.003;                //!< error offset
     }
 
     AE_ltcWrite((uint16_t*)&ltcBat[0].cfgAr, cmdWRCFGA_pu16);
@@ -986,6 +987,9 @@ void AE_ltcBalance(Ltc682x * ltcBat, float *minCellVoltages, float * minBalanceV
     for(i = 0; i < slaveNumber; i++)
     {
         maskedDCC = ltcBat[i].statusRegB.CellOverFlag.flag & ~(0xFFFF << ltcBat[i].batConf.numberOfCell);
+        //This two line prevent ripple of leds.
+        ltcBat[i].balanceCellBits &= maskedDCC;
+        maskedDCC &= ltcBat[i].balanceCellBits;
 
         //<<<<<<<<<<<<<<<-Over Voltage->>>>>>>>>>>>>>>
         //DCC pins are scattered in several registers so we must mask them
@@ -1004,6 +1008,70 @@ void AE_ltcBalance(Ltc682x * ltcBat, float *minCellVoltages, float * minBalanceV
 
     AE_ltcWrite((uint16_t*)&ltcBat->cfgAr, cmdWRCFGA_pu16);
     AE_ltcWrite((uint16_t*)&ltcBat->cfgBr, cmdWRCFGB_pu16);
+
+    /**
+     * ÇOK ONEMLİ
+     * Denge voltajımı 12V diyelim, ADC bu hücreyi bir çevrimdeki 11.9999 okurken diğer bir
+     * çevrimde 12,1111 olarak okuyor. Bu durum da 11.999 durumunda sönen ledin tekrar yanmasına
+     * sebebiyet veriyordu. Bu problemi çözmek için her bir okumada 0xFFFF değişkenini tutan
+     * ltcBat[0].balanceCellBits değişkeni maskelendi ve maske diğer bir çevrimde bu değerle tekrardan
+     * maskelenerek bir defa sönen ledin tekrar yanmaması sağlandı. Aşağıda yer alan fonksiyon ise balance
+     * durumu bittiğinde ltcBat[0].balanceCellBits değişkenine tekrardan 0xFFFF değerini atamakla görevli
+     * Bu fonksiyonların eksik olması balance işleminin yalnızca bir defaya mahsus olmasına sebep olur
+     */
+
+    /*if sum of all balanceCellBits is 0, balance is completed*/
+    uint32_t balanceControlFlag = 0;
+    for(i = 0; i < slaveNumber; i++)
+    {
+        balanceControlFlag += ltcBat[i].balanceCellBits;
+    }
+
+    if(balanceControlFlag == 0)
+    {
+        allBatteryBalanceStatus = true;
+        for(i = 0; i < slaveNumber; i++)
+        {
+            ltcBat[i].balanceCellBits = 0xFFFF;
+        }
+    }
+}
+
+/**
+ * @brief stop the balance if balance function is enabled
+ * @param[in] bms global variable
+ */
+void AE_balanceStop(Ltc682x * ltcBat)
+{
+    for(i = 0; i < slaveNumber; i++)
+    {
+        //clear the configuration register-A
+        memset((void*)&ltcBat[i].cfgAr.CFGAR0.cfg, 0, sizeof(CFGAR));
+
+        //enable REFON bit
+        ltcBat[i].cfgAr.CFGAR0.REFON = 1;
+
+        //clear the DCC13-15, DCC0 and discharge timer enable
+        ltcBat[i].cfgBr.CFGBR0.cfg &= 0x8F;
+        ltcBat[i].cfgBr.CFGBR1.DTMEN = 0;
+        ltcBat[i].cfgBr.CFGBR1.DCC0 = 0;
+    }
+
+    AE_ltcWrite((uint16_t*)&ltcBat[0].cfgAr, cmdWRCFGA_pu16);
+    AE_ltcWrite((uint16_t*)&ltcBat[0].cfgBr, cmdWRCFGB_pu16);
+}
+
+bool AE_ltcIsSystemInBalance()
+{
+    if(allBatteryBalanceStatus == true)
+        return true;
+
+    return false;
+}
+
+void AE_ltcResetSystemBalance()
+{
+    allBatteryBalanceStatus = false;
 }
 
 /**
@@ -1013,8 +1081,6 @@ LTC_status AE_ltcIsBalanceComplete(Ltc682x * ltcBat)
 {
     LTC_status status;
     uint16_t dccVal = 0;
-
-
 
     status = AE_ltcReadConfRegA(ltcBat);
     if(status == LTC_WRONG_CRC) return LTC_WRONG_CRC;
@@ -1349,9 +1415,4 @@ void AE_delayTenUs(uint32_t delay_u32)
 
     while(((getUsTick() - tickStart)) < delay_u32);
 }
-
-
-
-
-
 

@@ -479,6 +479,7 @@ typedef struct{
     float minCellVolt;
     LTC_status balanceStatus;
     float gio3Temperature;               //GPIO3 temperature on development board;
+    uint16_t balanceCellBits;            // used to prevent cell blinking do not use
     uint16_t pwmDuty[12];                /* ***Do not use this variable
                                          pwm blocks valid on PWM Register Group and PWM/S Control Register
                                          Group B so, send 12 bytes data*/
@@ -561,6 +562,9 @@ void AE_ltcContinuePwm(Ltc682x * ltcBat);
 
 void AE_ltcPreBalance(Ltc682x * ltcBat, DischargeTime DIS_, float * underVolt, float * overVolt, uint16_t DCC_);
 void AE_ltcBalance(Ltc682x * ltcBat, float *minCellVoltages, float * minBalanceVoltages);
+void AE_balanceStop(Ltc682x * ltcBat);
+bool AE_ltcIsSystemInBalance();
+void AE_ltcResetSystemBalance();
 LTC_status AE_ltcIsBalanceComplete(Ltc682x * ltcBat);
 void AE_ltcMinCellVolt(Ltc682x * ltcBat);
 float AE_ltcBatteryMinCellVolt(Ltc682x * ltcBat);
