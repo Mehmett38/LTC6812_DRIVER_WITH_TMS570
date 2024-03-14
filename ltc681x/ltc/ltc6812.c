@@ -243,7 +243,23 @@ void AE_ltcWriteConfRegB(Ltc682x * ltcBat)
  */
 LTC_status AE_ltcReadConfRegA(Ltc682x * ltcBat)
 {
-    return AE_ltcRead((uint16_t*)&ltcBat[0].cfgAr.CFGAR0.cfg, cmdRDCFGA_pu16);
+    LTC_status status;
+    uint16_t *ltcPtr;
+    uint8_t j = 0;
+
+    status = AE_ltcRead(rxBuffer, cmdRDCFGA_pu16);
+    if(status != LTC_OK) return LTC_WRONG_CRC;
+
+    for(i = 0; i < slaveNumber; i++)
+    {
+        ltcPtr = &ltcBat[i].cfgAr.CFGAR0.cfg;
+
+        for(j = 0; j < REGISTER_LEN; j++)
+        {
+            ltcPtr[i] = rxBuffer[i];
+        }
+    }
+    return status;
 }
 
 /**
@@ -253,7 +269,23 @@ LTC_status AE_ltcReadConfRegA(Ltc682x * ltcBat)
  */
 LTC_status AE_ltcReadConfRegB(Ltc682x * ltcBat)
 {
-    return AE_ltcRead((uint16_t*)&ltcBat->cfgBr.CFGBR0.cfg, cmdRDCFGB_pu16);
+    LTC_status status;
+    uint16_t *ltcPtr;
+    uint8_t j = 0;
+
+    status = AE_ltcRead(rxBuffer, cmdRDCFGB_pu16);
+    if(status != LTC_OK) return LTC_WRONG_CRC;
+
+    for(i = 0; i < slaveNumber; i++)
+    {
+        ltcPtr = &ltcBat[i].cfgBr.CFGBR0.cfg;
+
+        for(j = 0; j < REGISTER_LEN; j++)
+        {
+            ltcPtr[i] = rxBuffer[i];
+        }
+    }
+    return status;
 }
 
 /**
@@ -268,12 +300,13 @@ LTC_status AE_ltcReadCellVoltage(Ltc682x * ltcBat)
     uint16_t * fRxPtr = NULL;                  // to access the rx buffer's 8k index
     uint8_t j;                              // counter
 
+
+    //!< voltage register Group A
+    status = AE_ltcRead(rxBuffer, cmdRDCVA_pu16);
+    if(status == LTC_WRONG_CRC) return status;
+
     for(j = 0; j < slaveNumber; j++)
     {
-        //!< voltage register Group A
-        status = AE_ltcRead(rxBuffer, cmdRDCVA_pu16);
-        if(status == LTC_WRONG_CRC) return status;
-
         fLtcPtr = &ltcBat[j].volt.cell1;    // to access the voltage register index by index
         fRxPtr = &rxBuffer[j * RECEIVE_LEN];
 
@@ -281,34 +314,61 @@ LTC_status AE_ltcReadCellVoltage(Ltc682x * ltcBat)
         {   //offset = 0
             fLtcPtr[i] = ((fRxPtr[i*2] << 0) | (fRxPtr[i*2 + 1] << 8)) / 10000.0;  //!< 10000 comes from datasheet
         }
+    }
 
-        //!< voltage register Group B
-        status = AE_ltcRead(rxBuffer, cmdRDCVB_pu16);
-        if(status == LTC_WRONG_CRC) return status;
+    //!< voltage register Group B
+    status = AE_ltcRead(rxBuffer, cmdRDCVB_pu16);
+    if(status == LTC_WRONG_CRC) return status;
+
+    for(j = 0; j < slaveNumber; j++)
+    {
+        fLtcPtr = &ltcBat[j].volt.cell1;    // to access the voltage register index by index
+        fRxPtr = &rxBuffer[j * RECEIVE_LEN];
+
         for(i = 0; i < 3; i++)
         {   //offset = 3
             fLtcPtr[i + 3] = ((fRxPtr[i*2] << 0) | (fRxPtr[i*2 + 1] << 8)) / 10000.0;  //!< 10000 comes from datasheet
         }
+    }
 
-        //!< voltage register Group C
-        status = AE_ltcRead(rxBuffer, cmdRDCVC_pu16);
-        if(status == LTC_WRONG_CRC) return status;
+    //!< voltage register Group C
+    status = AE_ltcRead(rxBuffer, cmdRDCVC_pu16);
+    if(status == LTC_WRONG_CRC) return status;
+
+    for(j = 0; j < slaveNumber; j++)
+    {
+        fLtcPtr = &ltcBat[j].volt.cell1;    // to access the voltage register index by index
+        fRxPtr = &rxBuffer[j * RECEIVE_LEN];
         for(i = 0; i < 3; i++)
         {   //offset = 6
             fLtcPtr[i + 6] = ((fRxPtr[i*2] << 0) | (fRxPtr[i*2 + 1] << 8)) / 10000.0;  //!< 10000 comes from datasheet
         }
+    }
 
-        //!< voltage register Group D
-        status = AE_ltcRead(rxBuffer, cmdRDCVD_pu16);
-        if(status == LTC_WRONG_CRC) return status;
+    //!< voltage register Group D
+    status = AE_ltcRead(rxBuffer, cmdRDCVD_pu16);
+    if(status == LTC_WRONG_CRC) return status;
+
+    for(j = 0; j < slaveNumber; j++)
+    {
+        fLtcPtr = &ltcBat[j].volt.cell1;    // to access the voltage register index by index
+        fRxPtr = &rxBuffer[j * RECEIVE_LEN];
+
         for(i = 0; i < 3; i++)
         {   //offset = 9
             fLtcPtr[i + 9] = ((fRxPtr[i*2] << 0) | (fRxPtr[i*2 + 1] << 8)) / 10000.0;  //!< 10000 comes from datasheet
         }
+    }
 
-        //!< voltage register Group E
-        status = AE_ltcRead(rxBuffer, cmdRDCVE_pu16);
-        if(status == LTC_WRONG_CRC) return status;
+    //!< voltage register Group E
+    status = AE_ltcRead(rxBuffer, cmdRDCVE_pu16);
+    if(status == LTC_WRONG_CRC) return status;
+
+    for(j = 0; j < slaveNumber; j++)
+    {
+        fLtcPtr = &ltcBat[j].volt.cell1;    // to access the voltage register index by index
+        fRxPtr = &rxBuffer[j * RECEIVE_LEN];
+
         for(i = 0; i < 3; i++)
         {   //offset = 12
             fLtcPtr[i + 12] = ((fRxPtr[i*2] << 0) | (fRxPtr[i*2 + 1] << 8)) / 10000.0;  //!< 10000 comes from datasheet
@@ -498,12 +558,13 @@ LTC_status AE_ltcReadGpioVoltage(Ltc682x * ltcBat)
     uint16_t * fRxPtr = NULL;               // to access the rx buffer's 8k index
     uint8_t j;                              // counter
 
+
+    //!< voltage register Group A
+    status = AE_ltcRead(rxBuffer, cmdRDAUXA_pu16);
+    if(status == LTC_WRONG_CRC) return status;
+
     for(j = 0; j < slaveNumber; j++)
     {
-        //!< voltage register Group A
-        status = AE_ltcRead(rxBuffer, cmdRDAUXA_pu16);
-        if(status == LTC_WRONG_CRC) return status;
-
         fLtcPtr = &ltcBat[j].gpio.gpio1;    // to access the voltage register index by index
         fRxPtr = &rxBuffer[j * RECEIVE_LEN];
 
@@ -511,28 +572,45 @@ LTC_status AE_ltcReadGpioVoltage(Ltc682x * ltcBat)
         {   //offset + 12
             fLtcPtr[i] = ((fRxPtr[i*2] << 0) | (fRxPtr[i*2 + 1] << 8)) / 10000.0;  //!< 10000 comes from datasheet
         }
+    }
 
-        //!< voltage register Group B
-        status = AE_ltcRead(rxBuffer, cmdRDAUXB_pu16);
-        if(status == LTC_WRONG_CRC) return status;
+    //!< voltage register Group B
+    status = AE_ltcRead(rxBuffer, cmdRDAUXB_pu16);
+    if(status == LTC_WRONG_CRC) return status;
+
+    for(j = 0; j < slaveNumber; j++)
+    {
+        fLtcPtr = &ltcBat[j].gpio.gpio1;    // to access the voltage register index by index
+        fRxPtr = &rxBuffer[j * RECEIVE_LEN];
 
         for(i = 0; i < 3; i++)
         {   //offset + 12
             fLtcPtr[i + 3] = ((fRxPtr[i*2] << 0) | (fRxPtr[i*2 + 1] << 8)) / 10000.0;  //!< 10000 comes from datasheet
         }
+    }
 
-        //!< voltage register Group C
-        status = AE_ltcRead(rxBuffer, cmdRDAUXC_pu16);
-        if(status == LTC_WRONG_CRC) return status;
+    //!< voltage register Group C
+    status = AE_ltcRead(rxBuffer, cmdRDAUXC_pu16);
+    if(status == LTC_WRONG_CRC) return status;
 
+    for(j = 0; j < slaveNumber; j++)
+    {
+        fLtcPtr = &ltcBat[j].gpio.gpio1;    // to access the voltage register index by index
+        fRxPtr = &rxBuffer[j * RECEIVE_LEN];
         for(i = 0; i < 3; i++)
         {   //offset + 12
             fLtcPtr[i + 6] = ((fRxPtr[i*2] << 0) | (fRxPtr[i*2 + 1] << 8)) / 10000.0;  //!< 10000 comes from datasheet
         }
+    }
 
-        //!< voltage register Group D
-        status = AE_ltcRead(rxBuffer, cmdRDAUXD_pu16);
-        if(status == LTC_WRONG_CRC) return status;
+    //!< voltage register Group D
+    status = AE_ltcRead(rxBuffer, cmdRDAUXD_pu16);
+    if(status == LTC_WRONG_CRC) return status;
+
+    for(j = 0; j < slaveNumber; j++)
+    {
+        fLtcPtr = &ltcBat[j].gpio.gpio1;    // to access the voltage register index by index
+        fRxPtr = &rxBuffer[j * RECEIVE_LEN];
 
         for(i = 0; i < 1; i++)
         {   //offset + 12
@@ -893,7 +971,7 @@ void AE_ltcBalance(Ltc682x * ltcBat, float *minCellVoltages, float * minBalanceV
         ltcBat[i].cfgBr.CFGBR0.cfg &= 0x8F;
         ltcBat[i].cfgBr.CFGBR1.DTMEN = 0;
         ltcBat[i].cfgBr.CFGBR1.DCC0 = 0;
-        minCellVoltages[i] += 0.001;                //!< error offset
+//        minCellVoltages[i] += 0.005;                //!< error offset
     }
 
     AE_ltcWrite((uint16_t*)&ltcBat[0].cfgAr, cmdWRCFGA_pu16);
@@ -936,9 +1014,11 @@ LTC_status AE_ltcIsBalanceComplete(Ltc682x * ltcBat)
     LTC_status status;
     uint16_t dccVal = 0;
 
-    status = AE_ltcRead((uint16_t*)&ltcBat[i].cfgAr.CFGAR0.cfg, cmdRDCFGA_pu16);
+
+
+    status = AE_ltcReadConfRegA(ltcBat);
     if(status == LTC_WRONG_CRC) return LTC_WRONG_CRC;
-    status = AE_ltcRead((uint16_t*)&ltcBat[i].cfgBr.CFGBR0.cfg, cmdRDCFGB_pu16);
+    status = AE_ltcReadConfRegB(ltcBat);
     if(status == LTC_WRONG_CRC) return LTC_WRONG_CRC;
 
     for(i = 0; i < slaveNumber; i++)
